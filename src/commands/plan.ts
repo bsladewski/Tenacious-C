@@ -283,6 +283,9 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   // Get the appropriate CLI tool (reuse for all operations in this run)
   const aiTool = await getCliTool(specifiedCliTool);
   
+  // Generate initial plan
+  console.log('\n📋 Generating initial plan...');
+  
   // Execute using AI CLI tool
   await aiTool.execute(prompt);
 

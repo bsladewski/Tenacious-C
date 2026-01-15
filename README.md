@@ -216,14 +216,15 @@ All outputs are stored in `.tenacious-c/<timestamp>/` where `<timestamp>` is an 
 
 ## CLI Tool Selection
 
-Tenacious-C supports both Codex CLI and GitHub Copilot CLI. The tool automatically detects which tools are available and manages your preference.
+Tenacious-C supports Codex CLI, GitHub Copilot CLI, and Cursor CLI. The tool automatically detects which tools are available and manages your preference.
 
 ### Auto-Detection
 
 On first run (or when no preference is saved):
 - If only Codex is available → uses Codex automatically
 - If only Copilot is available → uses Copilot automatically
-- If both are available → prompts you to select one
+- If only Cursor is available → uses Cursor automatically
+- If multiple are available → prompts you to select one
 
 Your selection is saved in `.tenacious-c/cli-tool-preference.json` for future runs.
 
@@ -232,6 +233,7 @@ Your selection is saved in `.tenacious-c/cli-tool-preference.json` for future ru
 You can explicitly specify a tool using `--cli-tool`:
 ```bash
 tenacious-c "Add feature" --cli-tool copilot
+tenacious-c "Add feature" --cli-tool cursor
 ```
 
 This will also save your preference for future runs.
@@ -243,7 +245,7 @@ All tools run in "YOLO" mode:
 - **Copilot**: Uses `copilot -p <prompt> --yolo` (enables all permissions for non-interactive execution)
 - **Cursor**: Uses `cursor-agent -p <prompt> --force` (force allows commands without approval)
 
-Both tools execute prompts in the background with loading indicators.
+All tools execute prompts in the background with loading indicators.
 
 ## Development
 
@@ -285,6 +287,7 @@ src/
   tools/
     codex-cli-tool.ts          # Codex CLI implementation
     copilot-cli-tool.ts        # Copilot CLI implementation
+    cursor-cli-tool.ts         # Cursor CLI implementation
   utils/
     get-cli-tool.ts            # CLI tool selection logic
     detect-cli-tools.ts        # Tool availability detection
