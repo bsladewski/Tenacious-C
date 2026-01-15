@@ -5,6 +5,8 @@ import { executePlan } from './commands/plan';
 // Export the interface and implementation for use in other modules
 export { AICliTool } from './interfaces/ai-cli-tool';
 export { CodexCliTool } from './tools/codex-cli-tool';
+export { CopilotCliTool } from './tools/copilot-cli-tool';
+export { CursorCliTool } from './tools/cursor-cli-tool';
 
 // Export plan command
 export { executePlan } from './commands/plan';
@@ -27,21 +29,37 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>]');
+    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor>] [--the-prompt-of-destiny]');
     console.error('');
     console.error('Examples:');
     console.error('  tenacious-c "Add user authentication"');
     console.error('  tenacious-c requirements.txt');
     console.error('  tenacious-c "Add user authentication" --max-plan-iterations 5');
+    console.error('  tenacious-c "Add user authentication" --plan-confidence 90');
+    console.error('  tenacious-c "Add user authentication" --max-follow-up-iterations 15');
+    console.error('  tenacious-c "Add user authentication" --exec-iterations 3');
+    console.error('  tenacious-c "Add user authentication" --cli-tool copilot');
+    console.error('  tenacious-c "Add user authentication" --cli-tool cursor');
+    console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
     console.error('');
     console.error('Options:');
-    console.error('  --max-plan-iterations <number>  Maximum number of plan revisions (default: 10)');
+    console.error('  --max-plan-iterations <number>      Maximum number of plan revisions (default: 10)');
+    console.error('  --plan-confidence <number>          Minimum confidence threshold (0-100) (default: 85)');
+    console.error('  --max-follow-up-iterations <number>  Maximum number of follow-up execution iterations (default: 10)');
+    console.error('  --exec-iterations <number>          Maximum number of plan-based execution iterations (default: 5)');
+    console.error('  --cli-tool <codex|copilot|cursor>  CLI tool to use (default: auto-detect or prompt)');
+    console.error('  --the-prompt-of-destiny             Override all iteration limits - continue until truly done');
     process.exit(1);
   }
 
   // Parse arguments
   let input = '';
   let maxRevisions = 10; // Default value
+  let planConfidence = 85; // Default value
+  let maxFollowUpIterations = 10; // Default value
+  let execIterations = 5; // Default value
+  let thePromptOfDestiny = false; // Default value
+  let cliTool: 'codex' | 'copilot' | 'cursor' | null = null; // Default value
   
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -72,6 +90,110 @@ async function main() {
         process.exit(1);
       }
       maxRevisions = parsed;
+    } else if (arg === '--plan-confidence') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --plan-confidence requires a number value');
+        process.exit(1);
+      }
+      const parsed = parseFloat(value);
+      if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+        console.error('Error: --plan-confidence must be a number between 0 and 100');
+        process.exit(1);
+      }
+      planConfidence = parsed;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--plan-confidence=')) {
+      // Handle --plan-confidence=85 format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --plan-confidence= requires a number value');
+        process.exit(1);
+      }
+      const parsed = parseFloat(value);
+      if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+        console.error('Error: --plan-confidence must be a number between 0 and 100');
+        process.exit(1);
+      }
+      planConfidence = parsed;
+    } else if (arg === '--max-follow-up-iterations') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --max-follow-up-iterations requires a number value');
+        process.exit(1);
+      }
+      const parsed = parseInt(value, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        console.error('Error: --max-follow-up-iterations must be a positive integer');
+        process.exit(1);
+      }
+      maxFollowUpIterations = parsed;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--max-follow-up-iterations=')) {
+      // Handle --max-follow-up-iterations=10 format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --max-follow-up-iterations= requires a number value');
+        process.exit(1);
+      }
+      const parsed = parseInt(value, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        console.error('Error: --max-follow-up-iterations must be a positive integer');
+        process.exit(1);
+      }
+      maxFollowUpIterations = parsed;
+    } else if (arg === '--exec-iterations') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --exec-iterations requires a number value');
+        process.exit(1);
+      }
+      const parsed = parseInt(value, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        console.error('Error: --exec-iterations must be a positive integer');
+        process.exit(1);
+      }
+      execIterations = parsed;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--exec-iterations=')) {
+      // Handle --exec-iterations=5 format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --exec-iterations= requires a number value');
+        process.exit(1);
+      }
+      const parsed = parseInt(value, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        console.error('Error: --exec-iterations must be a positive integer');
+        process.exit(1);
+      }
+      execIterations = parsed;
+    } else if (arg === '--cli-tool') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --cli-tool requires a value (codex, copilot, or cursor)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor') {
+        console.error('Error: --cli-tool must be one of "codex", "copilot", or "cursor"');
+        process.exit(1);
+      }
+      cliTool = value as 'codex' | 'copilot' | 'cursor';
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--cli-tool=')) {
+      // Handle --cli-tool=copilot format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --cli-tool= requires a value (codex, copilot, or cursor)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor') {
+        console.error('Error: --cli-tool must be one of "codex", "copilot", or "cursor"');
+        process.exit(1);
+      }
+      cliTool = value as 'codex' | 'copilot' | 'cursor';
+    } else if (arg === '--the-prompt-of-destiny') {
+      thePromptOfDestiny = true;
     } else {
       // It's part of the input prompt
       if (input) {
@@ -81,6 +203,14 @@ async function main() {
       }
     }
   }
+  
+  // If --the-prompt-of-destiny is set, override all iteration limits
+  if (thePromptOfDestiny) {
+    maxRevisions = Number.MAX_SAFE_INTEGER;
+    maxFollowUpIterations = Number.MAX_SAFE_INTEGER;
+    execIterations = Number.MAX_SAFE_INTEGER;
+    console.log('\n🌟 The Prompt of Destiny activated! All iteration limits overridden. Continuing until truly done...\n');
+  }
 
   if (!input) {
     console.error('Error: No prompt or file path provided');
@@ -88,7 +218,7 @@ async function main() {
   }
 
   try {
-    await executePlan(input, maxRevisions);
+    await executePlan(input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool);
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

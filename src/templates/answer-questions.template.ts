@@ -65,6 +65,19 @@ You MUST NOT modify any files besides the plan markdown and metadata JSON in \`{
 
 ---
 
+## Q&A History
+
+The following is a complete history of all questions and answers from previous revision iterations. Use this to:
+- Avoid asking the same questions again
+- Maintain consistency with previous decisions
+- Understand the context of how the plan has evolved
+
+{{qaHistory}}
+
+**Note:** If the Q&A history is empty, this is the first iteration of question-answering.
+
+---
+
 ## Plan Metadata Schema
 
 The metadata file at \`{{outputDirectory}}/plan-metadata.json\` MUST conform to this schema:
@@ -105,6 +118,6 @@ You MUST update both files:
 
 Ensure both files are valid and properly formatted.`,
     description: 'Template for revising plans with answers to open questions',
-    requiredVariables: ['outputDirectory', 'answers'],
+    requiredVariables: ['outputDirectory', 'answers', 'qaHistory'],
   };
 }
