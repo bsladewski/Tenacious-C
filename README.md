@@ -1,6 +1,6 @@
 # Tenacious C
 
-An intelligent, iterative AI-powered development tool that generates comprehensive plans and executes them using AI CLI tools (Codex, GitHub Copilot, or Cursor). Tenacious C runs in "YOLO" mode, allowing AI tools to modify files and run commands without prompting for permission, making it ideal for iterative task completion.
+An intelligent, iterative AI-powered development tool that generates comprehensive plans and executes them using AI CLI tools (Codex, GitHub Copilot, Cursor, or Claude Code). Tenacious C runs in "YOLO" mode, allowing AI tools to modify files and run commands without prompting for permission, making it ideal for iterative task completion.
 
 ## Features
 
@@ -8,7 +8,7 @@ An intelligent, iterative AI-powered development tool that generates comprehensi
 - **Iterative Refinement**: Automatically refines plans through question-answering and confidence-based improvements
 - **Plan Execution**: Executes plans with automatic follow-up iterations to handle blockers
 - **Gap Analysis**: Performs gap audits and generates gap closure plans when execution reveals missing requirements
-- **Multi-Tool Support**: Works with the Codex CLI, GitHub Copilot CLI, and Cursor CLI
+- **Multi-Tool Support**: Works with the Codex CLI, GitHub Copilot CLI, Cursor CLI, and Claude Code CLI
 - **Smart Tool Selection**: Auto-detects available tools and remembers your preference
 - **The Prompt of Destiny**: Override all limits to continue until truly done
 
@@ -23,6 +23,7 @@ An intelligent, iterative AI-powered development tool that generates comprehensi
   - [GitHub Copilot CLI](https://github.com/github/copilot-cli) installed via `npm install -g @github/copilot`
     - **Important**: Before using Copilot CLI in non-interactive mode, you must enable a model by running `copilot --model <model-name>` in interactive mode first. For example: `copilot --model gpt-5.1-codex` or `copilot --model claude-haiku-4.5`
   - [Cursor CLI](https://docs.cursor.com/en/cli) (cursor-agent) installed via `curl https://cursor.com/install -fsS | bash`
+  - [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/quickstart) installed via `npm install -g @anthropic-ai/claude-code`
 
 ### Install from Local Source
 
@@ -117,7 +118,7 @@ Maximum number of plan-based execution iterations. The tool can execute the plan
 tenacious-c "Add user authentication" --exec-iterations 3
 ```
 
-#### `--cli-tool <codex|copilot|cursor>`
+#### `--cli-tool <codex|copilot|cursor|claude>`
 
 Explicitly specify which CLI tool to use. If not specified, the tool will:
 1. Check for a saved preference in `.tenacious-c/cli-tool-preference.json`
@@ -129,6 +130,7 @@ Explicitly specify which CLI tool to use. If not specified, the tool will:
 ```bash
 tenacious-c "Add user authentication" --cli-tool copilot
 tenacious-c "Add user authentication" --cli-tool cursor
+tenacious-c "Add user authentication" --cli-tool claude
 ```
 
 #### `--the-prompt-of-destiny`
@@ -216,7 +218,7 @@ All outputs are stored in `.tenacious-c/<timestamp>/` where `<timestamp>` is an 
 
 ## CLI Tool Selection
 
-Tenacious C supports Codex CLI, GitHub Copilot CLI, and Cursor CLI. The tool automatically detects which tools are available and manages your preference.
+Tenacious C supports Codex CLI, GitHub Copilot CLI, Cursor CLI, and Claude Code CLI. The tool automatically detects which tools are available and manages your preference.
 
 ### Auto-Detection
 
@@ -224,6 +226,7 @@ On first run (or when no preference is saved):
 - If only Codex is available → uses Codex automatically
 - If only Copilot is available → uses Copilot automatically
 - If only Cursor is available → uses Cursor automatically
+- If only Claude is available → uses Claude automatically
 - If multiple are available → prompts you to select one
 
 Your selection is saved in `.tenacious-c/cli-tool-preference.json` for future runs.
@@ -234,6 +237,7 @@ You can explicitly specify a tool using `--cli-tool`:
 ```bash
 tenacious-c "Add feature" --cli-tool copilot
 tenacious-c "Add feature" --cli-tool cursor
+tenacious-c "Add feature" --cli-tool claude
 ```
 
 This will also save your preference for future runs.
@@ -244,6 +248,7 @@ All tools run in "YOLO" mode:
 - **Codex**: Uses `codex exec --dangerously-bypass-approvals-and-sandbox`
 - **Copilot**: Uses `copilot -p <prompt> --yolo` (enables all permissions for non-interactive execution)
 - **Cursor**: Uses `cursor-agent -p <prompt> --force` (force allows commands without approval)
+- **Claude**: Uses `claude -p <prompt> --dangerously-skip-permissions` (bypasses all permission checks)
 
 All tools execute prompts in the background with loading indicators.
 
@@ -288,6 +293,7 @@ src/
     codex-cli-tool.ts          # Codex CLI implementation
     copilot-cli-tool.ts        # Copilot CLI implementation
     cursor-cli-tool.ts         # Cursor CLI implementation
+    claude-cli-tool.ts         # Claude Code CLI implementation
   utils/
     get-cli-tool.ts            # CLI tool selection logic
     detect-cli-tools.ts        # Tool availability detection

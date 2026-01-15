@@ -7,6 +7,7 @@ export { AICliTool } from './interfaces/ai-cli-tool';
 export { CodexCliTool } from './tools/codex-cli-tool';
 export { CopilotCliTool } from './tools/copilot-cli-tool';
 export { CursorCliTool } from './tools/cursor-cli-tool';
+export { ClaudeCliTool } from './tools/claude-cli-tool';
 
 // Export plan command
 export { executePlan } from './commands/plan';
@@ -29,7 +30,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor>] [--the-prompt-of-destiny]');
+    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--the-prompt-of-destiny]');
     console.error('');
     console.error('Examples:');
     console.error('  tenacious-c "Add user authentication"');
@@ -40,6 +41,7 @@ async function main() {
     console.error('  tenacious-c "Add user authentication" --exec-iterations 3');
     console.error('  tenacious-c "Add user authentication" --cli-tool copilot');
     console.error('  tenacious-c "Add user authentication" --cli-tool cursor');
+    console.error('  tenacious-c "Add user authentication" --cli-tool claude');
     console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
     console.error('');
     console.error('Options:');
@@ -47,7 +49,7 @@ async function main() {
     console.error('  --plan-confidence <number>          Minimum confidence threshold (0-100) (default: 85)');
     console.error('  --max-follow-up-iterations <number>  Maximum number of follow-up execution iterations (default: 10)');
     console.error('  --exec-iterations <number>          Maximum number of plan-based execution iterations (default: 5)');
-    console.error('  --cli-tool <codex|copilot|cursor>  CLI tool to use (default: auto-detect or prompt)');
+    console.error('  --cli-tool <codex|copilot|cursor|claude>  CLI tool to use (default: auto-detect or prompt)');
     console.error('  --the-prompt-of-destiny             Override all iteration limits - continue until truly done');
     process.exit(1);
   }
@@ -59,7 +61,7 @@ async function main() {
   let maxFollowUpIterations = 10; // Default value
   let execIterations = 5; // Default value
   let thePromptOfDestiny = false; // Default value
-  let cliTool: 'codex' | 'copilot' | 'cursor' | null = null; // Default value
+  let cliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
   
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -174,11 +176,11 @@ async function main() {
         console.error('Error: --cli-tool requires a value (codex, copilot, or cursor)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor') {
-        console.error('Error: --cli-tool must be one of "codex", "copilot", or "cursor"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
         process.exit(1);
       }
-      cliTool = value as 'codex' | 'copilot' | 'cursor';
+      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
       i++; // Skip the next argument as it's the value
     } else if (arg.startsWith('--cli-tool=')) {
       // Handle --cli-tool=copilot format
@@ -187,11 +189,11 @@ async function main() {
         console.error('Error: --cli-tool= requires a value (codex, copilot, or cursor)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor') {
-        console.error('Error: --cli-tool must be one of "codex", "copilot", or "cursor"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
         process.exit(1);
       }
-      cliTool = value as 'codex' | 'copilot' | 'cursor';
+      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
     } else if (arg === '--the-prompt-of-destiny') {
       thePromptOfDestiny = true;
     } else {

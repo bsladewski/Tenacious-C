@@ -2,6 +2,7 @@ import { AICliTool } from '../interfaces/ai-cli-tool';
 import { CodexCliTool } from '../tools/codex-cli-tool';
 import { CopilotCliTool } from '../tools/copilot-cli-tool';
 import { CursorCliTool } from '../tools/cursor-cli-tool';
+import { ClaudeCliTool } from '../tools/claude-cli-tool';
 import { CliToolType } from './cli-tool-preference';
 import { loadCliToolPreference, saveCliToolPreference } from './cli-tool-preference';
 import { detectAvailableTools } from './detect-cli-tools';
@@ -22,8 +23,10 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
       return new CodexCliTool();
     } else if (specifiedTool === 'copilot') {
       return new CopilotCliTool();
-    } else {
+    } else if (specifiedTool === 'cursor') {
       return new CursorCliTool();
+    } else {
+      return new ClaudeCliTool();
     }
   }
   
@@ -34,13 +37,16 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
     const available = detectAvailableTools();
     if ((savedPreference === 'codex' && available.codex) || 
         (savedPreference === 'copilot' && available.copilot) ||
-        (savedPreference === 'cursor' && available.cursor)) {
+        (savedPreference === 'cursor' && available.cursor) ||
+        (savedPreference === 'claude' && available.claude)) {
       if (savedPreference === 'codex') {
         return new CodexCliTool();
       } else if (savedPreference === 'copilot') {
         return new CopilotCliTool();
-      } else {
+      } else if (savedPreference === 'cursor') {
         return new CursorCliTool();
+      } else {
+        return new ClaudeCliTool();
       }
     }
   }
@@ -48,12 +54,12 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
   // No preference or saved tool not available - detect and prompt if needed
   const available = detectAvailableTools();
   
-  if (!available.codex && !available.copilot && !available.cursor) {
-    throw new Error('No CLI tools are available. Please install Codex CLI, GitHub Copilot CLI, or Cursor CLI.');
+  if (!available.codex && !available.copilot && !available.cursor && !available.claude) {
+    throw new Error('No CLI tools are available. Please install Codex CLI, GitHub Copilot CLI, Cursor CLI, or Claude Code CLI.');
   }
   
   // Count available tools
-  const availableCount = [available.codex, available.copilot, available.cursor].filter(Boolean).length;
+  const availableCount = [available.codex, available.copilot, available.cursor, available.claude].filter(Boolean).length;
   
   // If only one is available, use it
   if (availableCount === 1) {
@@ -65,9 +71,13 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
       const tool = new CopilotCliTool();
       saveCliToolPreference('copilot');
       return tool;
-    } else {
+    } else if (available.cursor) {
       const tool = new CursorCliTool();
       saveCliToolPreference('cursor');
+      return tool;
+    } else {
+      const tool = new ClaudeCliTool();
+      saveCliToolPreference('claude');
       return tool;
     }
   }
@@ -82,7 +92,9 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
     return new CodexCliTool();
   } else if (selectedTool === 'copilot') {
     return new CopilotCliTool();
-  } else {
+  } else if (selectedTool === 'cursor') {
     return new CursorCliTool();
+  } else {
+    return new ClaudeCliTool();
   }
 }

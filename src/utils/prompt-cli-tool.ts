@@ -10,6 +10,7 @@ export async function promptForCliTool(availableTools: {
   codex: boolean;
   copilot: boolean;
   cursor: boolean;
+  claude: boolean;
 }): Promise<CliToolType> {
   const choices = [];
   
@@ -31,6 +32,13 @@ export async function promptForCliTool(availableTools: {
     choices.push({
       name: 'Cursor',
       value: 'cursor' as CliToolType,
+    });
+  }
+  
+  if (availableTools.claude) {
+    choices.push({
+      name: 'Claude Code',
+      value: 'claude' as CliToolType,
     });
   }
   
