@@ -1,6 +1,6 @@
-# Tenacious-C
+# Tenacious C
 
-An intelligent, iterative AI-powered development tool that generates comprehensive plans and executes them using AI CLI tools (Codex, GitHub Copilot, or Cursor). Tenacious-C runs in "YOLO" mode, allowing AI tools to modify files and run commands without prompting for permission, making it ideal for iterative task completion.
+An intelligent, iterative AI-powered development tool that generates comprehensive plans and executes them using AI CLI tools (Codex, GitHub Copilot, or Cursor). Tenacious C runs in "YOLO" mode, allowing AI tools to modify files and run commands without prompting for permission, making it ideal for iterative task completion.
 
 ## Features
 
@@ -28,7 +28,7 @@ An intelligent, iterative AI-powered development tool that generates comprehensi
 
 1. Clone or navigate to this repository:
    ```bash
-   cd /path/to/Tenacious-C
+   cd /path/to/tenacious-c
    ```
 
 2. Install dependencies:
@@ -144,7 +144,7 @@ tenacious-c "Add user authentication" --the-prompt-of-destiny
 
 ### Workflow Overview
 
-Tenacious-C follows a comprehensive workflow to ensure thorough plan generation and execution:
+Tenacious C follows a comprehensive workflow to ensure thorough plan generation and execution:
 
 1. **Plan Generation**: Creates an initial plan based on your requirements
 2. **Iterative Refinement**: Refines the plan through multiple iterations:
@@ -216,7 +216,7 @@ All outputs are stored in `.tenacious-c/<timestamp>/` where `<timestamp>` is an 
 
 ## CLI Tool Selection
 
-Tenacious-C supports Codex CLI, GitHub Copilot CLI, and Cursor CLI. The tool automatically detects which tools are available and manages your preference.
+Tenacious C supports Codex CLI, GitHub Copilot CLI, and Cursor CLI. The tool automatically detects which tools are available and manages your preference.
 
 ### Auto-Detection
 

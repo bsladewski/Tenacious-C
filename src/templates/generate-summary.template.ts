@@ -6,7 +6,7 @@ import { PromptTemplate } from './prompt-template';
  */
 export function getGenerateSummaryTemplate(): PromptTemplate {
   return {
-    template: `You are generating a brief, terminal-friendly summary of a Tenacious-C execution run.
+    template: `You are generating a brief, terminal-friendly summary of a Tenacious C execution run.
 
 The execution artifacts are located in: \`{{timestampDirectory}}\`
 
@@ -48,7 +48,7 @@ Generate a plain text summary suitable for terminal display. Use terminal-friend
 
 \`\`\`
 ═══════════════════════════════════════════════════════════════
-                    TENACIOUS-C EXECUTION SUMMARY
+                    TENACIOUS C EXECUTION SUMMARY
 ═══════════════════════════════════════════════════════════════
 
 📋 ORIGINAL REQUIREMENTS
