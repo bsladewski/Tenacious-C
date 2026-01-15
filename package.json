@@ -1,0 +1,26 @@
+{
+  "name": "tenacious-c",
+  "version": "1.0.0",
+  "description": "An interactive terminal tool",
+  "main": "dist/index.js",
+  "bin": {
+    "tenacious-c": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "dev": "tsc && chmod +x dist/index.js && node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/inquirer": "^9.0.9",
+    "inquirer": "^13.2.0",
+    "ora": "^9.0.0"
+  }
+}
