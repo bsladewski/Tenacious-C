@@ -278,7 +278,24 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     }
     console.log(`   Last saved: ${new Date(state.lastSaved).toLocaleString()}`);
     
-    await resumePlan(state);
+    // Override saved config with command-line flags if provided
+    const overriddenConfig = {
+      maxRevisions: isDestinyMode ? Number.MAX_SAFE_INTEGER : maxRevisions,
+      planConfidenceThreshold,
+      maxFollowUpIterations: isDestinyMode ? Number.MAX_SAFE_INTEGER : maxFollowUpIterations,
+      execIterations: isDestinyMode ? Number.MAX_SAFE_INTEGER : execIterations,
+      isDestinyMode,
+      cliTool: specifiedCliTool ?? state.config.cliTool, // Use new CLI tool if specified, otherwise keep saved
+      previewPlan: previewPlanFlag,
+    };
+    
+    // Update state with overridden config
+    const updatedState = {
+      ...state,
+      config: overriddenConfig,
+    };
+    
+    await resumePlan(updatedState);
     return;
   }
   
