@@ -20,6 +20,8 @@ import { readExecuteMetadata } from '../utils/read-execute-metadata';
 import { readGapAuditMetadata } from '../utils/read-gap-audit-metadata';
 import { promptForHardBlockerResolution, formatHardBlockerResolutions } from '../utils/prompt-hard-blockers';
 import { generateFinalSummary } from '../utils/generate-final-summary';
+import { previewPlan } from '../utils/preview-plan';
+import inquirer from 'inquirer';
 
 /**
  * Format iteration display string (e.g., "1/5" or "1/🌟" in destiny mode)
@@ -248,8 +250,9 @@ async function executePlanWithFollowUps(
  * @param execIterations - Maximum number of plan-based execution iterations (default: 5)
  * @param isDestinyMode - Whether prompt of destiny mode is active (overrides all limits)
  * @param specifiedCliTool - CLI tool type specified via --cli-tool argument, or null
+ * @param previewPlanFlag - Whether to preview the plan before execution
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false): Promise<void> {
   // Determine if input is a file path or a string prompt
   let requirements: string;
   
@@ -288,6 +291,31 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   
   // Execute using AI CLI tool
   await aiTool.execute(prompt);
+
+  // Preview plan if requested
+  if (previewPlanFlag) {
+    const planPath = resolve(outputDirectory, 'plan.md');
+    console.log('\n📄 Previewing plan...');
+    await previewPlan(planPath);
+    console.log('\n');
+    
+    // Ask user if they want to continue with execution
+    const response = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continue',
+        message: 'Do you want to continue with plan execution?',
+        default: true,
+      },
+    ]);
+    
+    if (!response.continue) {
+      console.log('\n❌ Plan execution cancelled by user.\n');
+      process.exit(0);
+    }
+    
+    console.log('\n');
+  }
 
   // Iterative plan revision loop
   // Flow:

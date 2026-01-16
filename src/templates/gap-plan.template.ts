@@ -133,24 +133,6 @@ After creating the plan, verify:
 
 ---
 
-## Diagrams / Visualization
-
-When describing flows, lifecycles, or multi-step interactions, include a concise Mermaid diagram **in addition to** textual explanation.
-
-Use GitHub-flavored Mermaid fenced code blocks, for example:
-
-\`\`\`mermaid
-flowchart TD
-  A[Gap Identified] --> B[Plan Step]
-  B --> C[Implementation]
-  C --> D[Testing]
-  D --> E[Verification]
-\`\`\`
-
-Only include diagrams where they add clarity (e.g., non-trivial flows), not for trivial cases.
-
----
-
 ## Planning Guidelines
 
 - **Be comprehensive:** Address every gap identified in the audit

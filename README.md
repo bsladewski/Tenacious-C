@@ -133,6 +133,15 @@ tenacious-c "Add user authentication" --cli-tool cursor
 tenacious-c "Add user authentication" --cli-tool claude
 ```
 
+#### `--preview-plan`
+
+Preview the initial plan markdown file before proceeding to execution. The tool will display the plan using the best available viewer (glow if available, otherwise less, or cat as fallback). Press 'q' to exit the viewer and continue.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --preview-plan
+```
+
 #### `--the-prompt-of-destiny`
 
 Override all iteration limits. When enabled, the tool will continue iterating until the plan is truly complete, regardless of limits.
@@ -168,7 +177,6 @@ The tool generates structured plans with the following sections:
 - **Success Criteria**: Testable completion criteria
 - **Implementation Plan**: Step-by-step approach with file changes
 - **Testing Plan**: Testing strategy
-- **Diagrams**: Mermaid diagrams for complex flows
 
 Plans are refined iteratively:
 

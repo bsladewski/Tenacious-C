@@ -134,25 +134,6 @@ Every plan file MUST follow this top-level structure:
 
 ---
 
-## Diagrams / Visualization
-
-When describing flows, lifecycles, or multi-step interactions (e.g., request/response flow, auth handshake, lesson-mode progression, background jobs), include a concise Mermaid diagram **in addition to** textual explanation.
-
-Use GitHub-flavored Mermaid fenced code blocks, for example:
-
-\`\`\`mermaid
-flowchart TD
-  U[User] --> FE[Frontend]
-  FE --> BE[Backend API]
-  BE --> DB[(Database)]
-  BE --> FE
-  FE --> U
-\`\`\`
-
-Only include diagrams where they add clarity (e.g., non-trivial flows), not for trivial cases.
-
----
-
 ## AUDIT-DRIVEN PLANNING MODE (when input is an audit report)
 
 When the input is an audit report, you MUST treat the \`# Implementation Plan\` section as a 3-part structure and ensure every audit finding is either addressed or **explicitly deferred**.
