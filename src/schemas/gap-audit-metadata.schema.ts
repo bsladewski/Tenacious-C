@@ -8,6 +8,12 @@ export interface GapAuditMetadata {
    * Whether any implementation/quality gaps were identified
    */
   gapsIdentified: boolean;
+
+  /**
+   * Brief terminal-friendly summary of the gap audit results (1-2 paragraphs worth of text)
+   * This should be plain text, suitable for terminal display, summarizing what was audited and what gaps were found (if any)
+   */
+  summary: string;
 }
 
 /**
@@ -15,11 +21,15 @@ export interface GapAuditMetadata {
  */
 export const gapAuditMetadataJsonSchema = {
   type: 'object',
-  required: ['gapsIdentified'],
+  required: ['gapsIdentified', 'summary'],
   properties: {
     gapsIdentified: {
       type: 'boolean',
       description: 'Whether any implementation/quality gaps were identified',
+    },
+    summary: {
+      type: 'string',
+      description: 'Brief terminal-friendly summary of the gap audit results (1-2 paragraphs worth of text). Plain text, suitable for terminal display, summarizing what was audited and what gaps were found (if any).',
     },
   },
 };
@@ -36,4 +46,5 @@ export function getGapAuditMetadataSchemaString(): string {
  */
 export const exampleGapAuditMetadata: GapAuditMetadata = {
   gapsIdentified: false,
+  summary: 'Completed comprehensive audit of the authentication implementation against the original requirements. Verified all core features are implemented, code quality meets standards, and tests are in place. No gaps identified - implementation is complete and ready for production.',
 };

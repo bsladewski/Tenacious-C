@@ -16,6 +16,12 @@ export interface ExecuteMetadata {
    * missing critical credentials that cannot be inferred, etc.
    */
   hardBlockers: HardBlocker[];
+
+  /**
+   * Brief terminal-friendly summary of what was accomplished in this execution (1-2 paragraphs worth of text)
+   * This should be plain text, suitable for terminal display, summarizing the key work completed
+   */
+  summary: string;
 }
 
 export interface HardBlocker {
@@ -35,7 +41,7 @@ export interface HardBlocker {
  */
 export const executeMetadataJsonSchema = {
   type: 'object',
-  required: ['hasFollowUps', 'hardBlockers'],
+  required: ['hasFollowUps', 'hardBlockers', 'summary'],
   properties: {
     hasFollowUps: {
       type: 'boolean',
@@ -59,6 +65,10 @@ export const executeMetadataJsonSchema = {
       },
       description: 'List of hard blockers that prevent execution from continuing',
     },
+    summary: {
+      type: 'string',
+      description: 'Brief terminal-friendly summary of what was accomplished in this execution (1-2 paragraphs worth of text). Plain text, suitable for terminal display, summarizing the key work completed.',
+    },
   },
 };
 
@@ -75,4 +85,5 @@ export function getExecuteMetadataSchemaString(): string {
 export const exampleExecuteMetadata: ExecuteMetadata = {
   hasFollowUps: false,
   hardBlockers: [],
+  summary: 'Implemented user authentication system with JWT token generation and validation. Created login and registration API endpoints, added password hashing using bcrypt, and integrated session management middleware. All core authentication flows are now functional and tested.',
 };

@@ -81,6 +81,7 @@ ${metadataSchema}
 The metadata file contains:
 - \`confidence\`: A number (0-100) representing your confidence in the plan's completeness and accuracy
 - \`openQuestions\`: An array of questions that need clarification. **Each question MUST include at least 2 suggested answers** in the \`suggestedAnswers\` array to enable interactive selection.
+- \`summary\`: A brief terminal-friendly summary (1-2 paragraphs worth of text) of what was planned. Use plain text (no markdown formatting), suitable for terminal display, summarizing the key aspects of the plan: what will be implemented, main phases, and important decisions.
 
 **CRITICAL:** 
 - Open questions should be included in the metadata JSON file, NOT in the plan markdown file.

@@ -195,7 +195,11 @@ ${metadataSchema}
 **Important:**
 - The \`hasFollowUps\` boolean indicates whether the Follow-ups section in the execution summary has any items (set to \`true\` if there are any follow-ups listed, even if just one, or \`false\` if all follow-ups are complete)
 - Hard blockers should be rare - only include them when execution absolutely cannot continue without user intervention
-- Each hard blocker must have a clear \`description\` and \`reason\` explaining why it prevents continuation`,
+- Each hard blocker must have a clear \`description\` and \`reason\` explaining why it prevents continuation
+- The \`summary\` field must contain a brief terminal-friendly summary (1-2 paragraphs worth of text) of what was accomplished in this follow-up execution
+  - Use plain text (no markdown formatting)
+  - Suitable for terminal display
+  - Summarize the key work completed: what follow-up items were addressed, files modified, and any notable achievements`,
     description: 'Template for executing follow-up items from a previous execution',
     requiredVariables: ['executionSummaryPath', 'outputDirectory', 'executionIteration', 'followUpIteration'],
   };

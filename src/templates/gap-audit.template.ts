@@ -144,7 +144,11 @@ ${metadataSchema}
 **Important:**
 - The \`gapsIdentified\` boolean indicates whether any agent-actionable gaps were found
 - Only include gaps that can be addressed programmatically by the agent
-- Each gap must be detailed and specific with file references and clear action items`,
+- Each gap must be detailed and specific with file references and clear action items
+- The \`summary\` field must contain a brief terminal-friendly summary (1-2 paragraphs worth of text) of the audit results
+  - Use plain text (no markdown formatting)
+  - Suitable for terminal display
+  - Summarize what was audited, the overall assessment, and whether gaps were found (and if so, a brief overview of the types of gaps)`,
     description: 'Template for auditing implementation completeness and quality',
     requiredVariables: ['requirementsPath', 'planPath', 'outputDirectory', 'executionIteration'],
   };

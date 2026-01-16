@@ -13,6 +13,12 @@ export interface PlanMetadata {
    * List of open questions that need clarification
    */
   openQuestions: OpenQuestion[];
+
+  /**
+   * Brief terminal-friendly summary of what was planned (1-2 paragraphs worth of text)
+   * This should be plain text, suitable for terminal display, summarizing the key aspects of the plan
+   */
+  summary: string;
 }
 
 export interface OpenQuestion {
@@ -32,7 +38,7 @@ export interface OpenQuestion {
  */
 export const planMetadataJsonSchema = {
   type: 'object',
-  required: ['confidence', 'openQuestions'],
+  required: ['confidence', 'openQuestions', 'summary'],
   properties: {
     confidence: {
       type: 'number',
@@ -61,6 +67,10 @@ export const planMetadataJsonSchema = {
       },
       description: 'List of open questions that need clarification',
     },
+    summary: {
+      type: 'string',
+      description: 'Brief terminal-friendly summary of what was planned (1-2 paragraphs worth of text). Plain text, suitable for terminal display, summarizing the key aspects of the plan.',
+    },
   },
 };
 
@@ -82,4 +92,5 @@ export const examplePlanMetadata: PlanMetadata = {
       suggestedAnswers: ['React', 'Angular', 'Vue'],
     },
   ],
+  summary: 'This plan outlines the implementation of a user authentication system with JWT tokens, password hashing, and session management. The implementation will be split across three phases: core authentication logic, API endpoints, and frontend integration. Key components include user registration, login, token refresh, and password reset functionality.',
 };
