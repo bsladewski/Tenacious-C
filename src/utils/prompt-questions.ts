@@ -1,5 +1,5 @@
 import inquirer from 'inquirer';
-import { PlanMetadata, OpenQuestion } from '../schemas/plan-metadata.schema';
+import { OpenQuestion } from '../schemas/plan-metadata.schema';
 
 /**
  * Prompt user to answer open questions interactively

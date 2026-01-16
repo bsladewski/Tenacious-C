@@ -142,6 +142,21 @@ Preview the initial plan markdown file before proceeding to execution. The tool 
 tenacious-c "Add user authentication" --preview-plan
 ```
 
+#### `--resume`
+
+Resume the most recent interrupted run. The tool automatically saves execution state at key checkpoints, allowing you to resume after crashes, connectivity issues, or power loss. When resuming, the tool will:
+
+- Find the most recent incomplete run
+- Display the phase and progress information
+- Continue from where it left off
+
+**Example:**
+```bash
+tenacious-c --resume
+```
+
+**Note:** The tool saves state after each major phase (plan generation, execution, gap audit, gap plan). If a run is interrupted, use `--resume` to continue without losing progress.
+
 #### `--the-prompt-of-destiny`
 
 Override all iteration limits. When enabled, the tool will continue iterating until the plan is truly complete, regardless of limits.

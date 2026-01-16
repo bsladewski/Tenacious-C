@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { AICliTool } from '../interfaces/ai-cli-tool';
 import { getGenerateSummaryTemplate } from '../templates/generate-summary.template';

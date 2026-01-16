@@ -21,6 +21,10 @@ import { readGapAuditMetadata } from '../utils/read-gap-audit-metadata';
 import { promptForHardBlockerResolution, formatHardBlockerResolutions } from '../utils/prompt-hard-blockers';
 import { generateFinalSummary } from '../utils/generate-final-summary';
 import { previewPlan } from '../utils/preview-plan';
+import { saveExecutionState } from '../utils/save-execution-state';
+import { findLatestResumableRun } from '../utils/find-latest-run';
+import { createExecutionState } from '../utils/create-execution-state';
+import { resumePlan } from './resume-plan';
 import inquirer from 'inquirer';
 
 /**
@@ -44,7 +48,7 @@ function formatIteration(current: number, max: number, isDestinyMode: boolean): 
  * @param executionIteration - Current execution iteration number (for display)
  * @param isDestinyMode - Whether prompt of destiny mode is active
  */
-async function executePlanWithFollowUps(
+export async function executePlanWithFollowUps(
   planPath: string,
   requirementsPath: string,
   executeOutputDirectory: string,
@@ -234,7 +238,7 @@ async function executePlanWithFollowUps(
       } else {
         console.log('\n✅ Follow-up iterations complete.');
       }
-    } catch (error) {
+    } catch {
       // If we can't read metadata, that's okay - we've completed the iterations
       console.log('\n✅ Follow-up iterations complete.');
     }
@@ -251,8 +255,33 @@ async function executePlanWithFollowUps(
  * @param isDestinyMode - Whether prompt of destiny mode is active (overrides all limits)
  * @param specifiedCliTool - CLI tool type specified via --cli-tool argument, or null
  * @param previewPlanFlag - Whether to preview the plan before execution
+ * @param resumeFlag - Whether to resume from a previous run
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false): Promise<void> {
+  // If resume flag is set, find and resume the latest run
+  if (resumeFlag) {
+    const tenaciousCDir = resolve(process.cwd(), '.tenacious-c');
+    const state = findLatestResumableRun(tenaciousCDir);
+    
+    if (!state) {
+      console.error('\n❌ No resumable run found. Please start a new run first.\n');
+      process.exit(1);
+    }
+    
+    console.log(`\n🔄 Found resumable run in: ${state.timestampDirectory}`);
+    console.log(`   Phase: ${state.phase}`);
+    if (state.planGeneration) {
+      console.log(`   Plan revisions: ${state.planGeneration.revisionCount}`);
+    }
+    if (state.execution) {
+      console.log(`   Execution iterations: ${state.execution.execIterationCount}`);
+    }
+    console.log(`   Last saved: ${new Date(state.lastSaved).toLocaleString()}`);
+    
+    await resumePlan(state);
+    return;
+  }
+  
   // Determine if input is a file path or a string prompt
   let requirements: string;
   
@@ -276,6 +305,23 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   // Store the original requirements in the timestamp directory
   writeRequirements(timestampDirectory, requirements);
 
+  // Create initial execution state
+  let executionState = createExecutionState(
+    timestampDirectory,
+    requirements,
+    {
+      maxRevisions,
+      planConfidenceThreshold,
+      maxFollowUpIterations,
+      execIterations,
+      isDestinyMode,
+      cliTool: specifiedCliTool,
+      previewPlan: previewPlanFlag,
+    },
+    'plan-generation'
+  );
+  saveExecutionState(timestampDirectory, executionState);
+
   // Get the template and interpolate
   const template = getPlaceholderTemplate();
   const prompt = interpolateTemplate(template, {
@@ -291,6 +337,18 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   
   // Execute using AI CLI tool
   await aiTool.execute(prompt);
+
+  // Update state after initial plan generation
+  executionState = {
+    ...executionState,
+    phase: 'plan-revision',
+    planGeneration: {
+      revisionCount: 0,
+      planPath: resolve(outputDirectory, 'plan.md'),
+      outputDirectory,
+    },
+  };
+  saveExecutionState(timestampDirectory, executionState);
 
   // Preview plan if requested
   if (previewPlanFlag) {
@@ -366,6 +424,17 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         await aiTool.execute(answerPrompt);
         
         revisionCount++;
+        
+        // Update state
+        executionState = {
+          ...executionState,
+          planGeneration: {
+            ...executionState.planGeneration!,
+            revisionCount,
+          },
+        };
+        saveExecutionState(timestampDirectory, executionState);
+        
         // Continue loop to check for new questions or confidence
         continue;
       }
@@ -384,6 +453,17 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         await aiTool.execute(improvePrompt);
         
         revisionCount++;
+        
+        // Update state
+        executionState = {
+          ...executionState,
+          planGeneration: {
+            ...executionState.planGeneration!,
+            revisionCount,
+          },
+        };
+        saveExecutionState(timestampDirectory, executionState);
+        
         // Continue loop to check for new questions or if confidence is still low
         continue;
       }
@@ -411,11 +491,18 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     try {
       const finalMetadata = readPlanMetadata(outputDirectory);
       console.log(`\n✅ Plan complete! Confidence: ${finalMetadata.confidence}% (threshold: ${planConfidenceThreshold}%)`);
-    } catch (error) {
+    } catch {
       // If we can't read metadata, that's okay - we've completed the revisions
       console.log('\n✅ Plan revisions complete.');
     }
   }
+
+  // Update state to indicate plan generation is complete
+  executionState = {
+    ...executionState,
+    phase: 'execution',
+  };
+  saveExecutionState(timestampDirectory, executionState);
 
   // Prepare paths for execution (will be reused)
   const requirementsPath = resolve(timestampDirectory, 'requirements.txt');
@@ -439,6 +526,19 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       ? resolve(timestampDirectory, 'execute')
       : resolve(timestampDirectory, `execute-${execIterationCount}`);
     
+    // Update state before execution
+    executionState = {
+      ...executionState,
+      execution: {
+        execIterationCount,
+        currentPlanPath,
+        executeOutputDirectory,
+        followUpIterationCount: 0,
+        hasDoneIteration0: false,
+      },
+    };
+    saveExecutionState(timestampDirectory, executionState);
+    
     // Execute plan with follow-ups
     await executePlanWithFollowUps(
       currentPlanPath,
@@ -449,6 +549,13 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       execIterationCount,
       isDestinyMode
     );
+    
+    // Update state after execution
+    executionState = {
+      ...executionState,
+      phase: 'gap-audit',
+    };
+    saveExecutionState(timestampDirectory, executionState);
     
     // Run gap audit after execution and follow-up iterations are complete
     console.log('\n🔍 Running gap audit...');
@@ -474,6 +581,17 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     await aiTool.execute(gapAuditPrompt);
     
     console.log('\n✅ Gap audit complete!');
+    
+    // Update state after gap audit
+    executionState = {
+      ...executionState,
+      phase: 'gap-plan',
+      gapAudit: {
+        execIterationCount,
+        gapAuditOutputDirectory,
+      },
+    };
+    saveExecutionState(timestampDirectory, executionState);
     
     // Check if gaps were identified
     try {
@@ -515,6 +633,24 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       // Update current plan path for next iteration
       currentPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);
       
+      // Update state after gap plan
+      executionState = {
+        ...executionState,
+        phase: 'execution',
+        gapPlan: {
+          execIterationCount,
+          gapPlanOutputDirectory,
+        },
+        execution: {
+          execIterationCount,
+          currentPlanPath,
+          executeOutputDirectory: '', // Will be set in next iteration
+          followUpIterationCount: 0,
+          hasDoneIteration0: false,
+        },
+      };
+      saveExecutionState(timestampDirectory, executionState);
+      
     } catch (error) {
       // If metadata file doesn't exist or can't be read, assume gaps were found and continue
       if (error instanceof Error && error.message.includes('not found')) {
@@ -548,6 +684,13 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   if (execIterationCount >= execIterations) {
     console.log(`\n⚠️  Reached maximum execution iterations (${execIterations}). Stopping.\n`);
   }
+
+  // Mark as complete
+  executionState = {
+    ...executionState,
+    phase: 'complete',
+  };
+  saveExecutionState(timestampDirectory, executionState);
 
   // Generate and display final summary
   console.log('\n📊 Generating execution summary...\n');

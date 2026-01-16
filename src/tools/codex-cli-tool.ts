@@ -34,12 +34,11 @@ export class CodexCliTool implements AICliTool {
       });
 
       // Collect output but don't display it
-      let stdout = '';
       let stderr = '';
 
       if (child.stdout) {
-        child.stdout.on('data', (data) => {
-          stdout += data.toString();
+        child.stdout.on('data', () => {
+          // Collect but don't use stdout
         });
       }
 

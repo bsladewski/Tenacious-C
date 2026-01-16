@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from 'fs';
  * @returns Promise that resolves when the preview is closed
  */
 export function previewPlan(filePath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!existsSync(filePath)) {
       console.error(`Plan file not found: ${filePath}`);
       resolve();
@@ -54,7 +54,7 @@ export function previewPlan(filePath: string): Promise<void> {
       stdio: 'inherit',
     });
 
-    child.on('error', (error) => {
+    child.on('error', () => {
       // If spawn fails, fall back to cat
       console.log('\n--- Plan Preview ---\n');
       console.log(readFileSync(filePath, 'utf-8'));
@@ -62,7 +62,7 @@ export function previewPlan(filePath: string): Promise<void> {
       resolve();
     });
 
-    child.on('close', (code) => {
+    child.on('close', () => {
       // Exit code doesn't matter - user might have pressed 'q' in less
       resolve();
     });

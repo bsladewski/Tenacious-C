@@ -30,7 +30,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--preview-plan] [--the-prompt-of-destiny]');
+    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--preview-plan] [--resume] [--the-prompt-of-destiny]');
     console.error('');
     console.error('Examples:');
     console.error('  tenacious-c "Add user authentication"');
@@ -43,6 +43,7 @@ async function main() {
     console.error('  tenacious-c "Add user authentication" --cli-tool cursor');
     console.error('  tenacious-c "Add user authentication" --cli-tool claude');
     console.error('  tenacious-c "Add user authentication" --preview-plan');
+    console.error('  tenacious-c --resume');
     console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
     console.error('');
     console.error('Options:');
@@ -52,6 +53,7 @@ async function main() {
     console.error('  --exec-iterations <number>          Maximum number of plan-based execution iterations (default: 5)');
     console.error('  --cli-tool <codex|copilot|cursor|claude>  CLI tool to use (default: auto-detect or prompt)');
     console.error('  --preview-plan                      Preview the initial plan before execution');
+    console.error('  --resume                            Resume the most recent interrupted run');
     console.error('  --the-prompt-of-destiny             Override all iteration limits - continue until truly done');
     process.exit(1);
   }
@@ -65,6 +67,7 @@ async function main() {
   let thePromptOfDestiny = false; // Default value
   let cliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
   let previewPlan = false; // Default value
+  let resume = false; // Default value
   
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -197,10 +200,12 @@ async function main() {
         process.exit(1);
       }
       cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
-    } else if (arg === '--the-prompt-of-destiny') {
-      thePromptOfDestiny = true;
     } else if (arg === '--preview-plan') {
       previewPlan = true;
+    } else if (arg === '--resume') {
+      resume = true;
+    } else if (arg === '--the-prompt-of-destiny') {
+      thePromptOfDestiny = true;
     } else {
       // It's part of the input prompt
       if (input) {
@@ -219,13 +224,15 @@ async function main() {
     console.log('\n🌟 The Prompt of Destiny activated! All iteration limits overridden. Continuing until truly done...\n');
   }
 
-  if (!input) {
+  // If resume is set, input is not required
+  if (!resume && !input) {
     console.error('Error: No prompt or file path provided');
     process.exit(1);
   }
 
   try {
-    await executePlan(input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan);
+    // If resume is set, input is ignored (can be empty string)
+    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume);
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

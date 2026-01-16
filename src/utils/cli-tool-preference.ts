@@ -38,7 +38,7 @@ export function loadCliToolPreference(): CliToolType | null {
     }
     
     return null;
-  } catch (error) {
+  } catch {
     // If we can't read or parse the preference file, return null
     return null;
   }
