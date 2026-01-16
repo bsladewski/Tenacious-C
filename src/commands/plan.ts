@@ -25,6 +25,8 @@ import { saveExecutionState } from '../utils/save-execution-state';
 import { findLatestResumableRun } from '../utils/find-latest-run';
 import { createExecutionState } from '../utils/create-execution-state';
 import { resumePlan } from './resume-plan';
+import { getExecutionArtifacts } from '../utils/scan-execution-artifacts';
+import { syncStateWithArtifacts } from '../utils/sync-state-with-artifacts';
 import inquirer from 'inquirer';
 
 /**
@@ -60,67 +62,101 @@ export async function executePlanWithFollowUps(
   // Ensure execution output directory exists
   mkdirSync(executeOutputDirectory, { recursive: true });
 
-  // Get the execute template and interpolate
-  const executeTemplate = getExecutePlanTemplate();
-  const executePrompt = interpolateTemplate(executeTemplate, {
-    planPath,
-    requirementsPath,
-    outputDirectory: executeOutputDirectory,
-    executionIteration: executionIteration.toString(),
-  });
+  // Scan for existing execution artifacts to determine resume point
+  const artifacts = getExecutionArtifacts(executeOutputDirectory, executionIteration);
+  
+  // Check if initial execution was already done
+  if (!artifacts.initialExecutionDone) {
+    // Get the execute template and interpolate
+    const executeTemplate = getExecutePlanTemplate();
+    const executePrompt = interpolateTemplate(executeTemplate, {
+      planPath,
+      requirementsPath,
+      outputDirectory: executeOutputDirectory,
+      executionIteration: executionIteration.toString(),
+    });
 
-  // Execute using AI CLI tool
-  await aiTool.execute(executePrompt);
+    // Execute using AI CLI tool
+    await aiTool.execute(executePrompt);
 
-  console.log('\n✅ Plan execution complete!');
+    console.log('\n✅ Plan execution complete!');
+  } else {
+    console.log('\n✅ Initial execution already completed. Skipping...');
+  }
 
-  // Check for hard blockers after initial execution
-  let hasDoneIteration0 = false; // Track if we already did iteration 0 (initial hard blocker resolution)
-  try {
-    const initialExecuteMetadata = readExecuteMetadata(executeOutputDirectory);
-    if (initialExecuteMetadata.hardBlockers && initialExecuteMetadata.hardBlockers.length > 0) {
-      console.log(`\n🚫 Hard blockers detected after initial execution (${initialExecuteMetadata.hardBlockers.length}). User input required...`);
+  // Initialize follow-up state from artifacts
+  // Use artifact-based values as source of truth
+  let hasDoneIteration0 = artifacts.hasDoneIteration0;
+  
+  // Determine starting follow-up iteration count
+  // If we have completed iterations, start from the next one
+  // Otherwise start from 0
+  let followUpIterationCount: number;
+  if (artifacts.lastFollowUpIteration !== null) {
+    // We've completed some follow-ups, start from the next iteration
+    followUpIterationCount = artifacts.lastFollowUpIteration + 1;
+  } else {
+    // No follow-ups completed yet, start from 0
+    followUpIterationCount = 0;
+  }
 
-      // Prompt user for hard blocker resolution
-      const blockerResolutions = await promptForHardBlockerResolution(initialExecuteMetadata.hardBlockers);
+  // Check for hard blockers after initial execution (only if we just ran it or haven't resolved them)
+  // Skip if we've already done iteration 0 (hard blockers were resolved)
+  if (!artifacts.initialExecutionDone || (!hasDoneIteration0 && artifacts.initialExecutionDone)) {
+    try {
+      const initialExecuteMetadata = readExecuteMetadata(executeOutputDirectory);
+      if (initialExecuteMetadata.hardBlockers && initialExecuteMetadata.hardBlockers.length > 0) {
+        // Only prompt if hard blockers exist AND we haven't already resolved them (no iteration 0 artifact)
+        if (!hasDoneIteration0) {
+          console.log(`\n🚫 Hard blockers detected after initial execution (${initialExecuteMetadata.hardBlockers.length}). User input required...`);
 
-      // Format hard blocker resolutions for the template
-      const formattedResolutions = formatHardBlockerResolutions(initialExecuteMetadata.hardBlockers, blockerResolutions);
+          // Prompt user for hard blocker resolution
+          const blockerResolutions = await promptForHardBlockerResolution(initialExecuteMetadata.hardBlockers);
 
-      console.log('\n🔄 Executing follow-ups with hard blocker resolutions...');
+          // Format hard blocker resolutions for the template
+          const formattedResolutions = formatHardBlockerResolutions(initialExecuteMetadata.hardBlockers, blockerResolutions);
 
-      // Prepare paths for follow-up execution template
-      // Use iteration 0 for the initial follow-up execution after plan execution
-      const executionSummaryPath = resolve(executeOutputDirectory, `execution-summary-${executionIteration}.md`);
-      const followUpIteration = 0;
+          console.log('\n🔄 Executing follow-ups with hard blocker resolutions...');
 
-      // Track that we've done iteration 0
-      hasDoneIteration0 = true;
+          // Prepare paths for follow-up execution template
+          // Use iteration 0 for the initial follow-up execution after plan execution
+          const executionSummaryPath = resolve(executeOutputDirectory, `execution-summary-${executionIteration}.md`);
+          const followUpIteration = 0;
 
-      // Get the execute follow-ups template and interpolate
-      const followUpsTemplate = getExecuteFollowUpsTemplate();
-      const followUpsPrompt = interpolateTemplate(followUpsTemplate, {
-        executionSummaryPath,
-        outputDirectory: executeOutputDirectory,
-        hardBlockerResolutions: formattedResolutions,
-        executionIteration: executionIteration.toString(),
-        followUpIteration: followUpIteration.toString(),
-      });
+          // Track that we've done iteration 0
+          hasDoneIteration0 = true;
+          followUpIterationCount = 1; // Next iteration after 0
 
-      // Execute using AI CLI tool
-      await aiTool.execute(followUpsPrompt);
-    }
-  } catch (error) {
-    // If metadata file doesn't exist or can't be read, continue to follow-up loop
-    // This allows the tool to work even if metadata wasn't generated
-    if (!(error instanceof Error && error.message.includes('not found'))) {
-      throw error;
+          // Get the execute follow-ups template and interpolate
+          const followUpsTemplate = getExecuteFollowUpsTemplate();
+          const followUpsPrompt = interpolateTemplate(followUpsTemplate, {
+            executionSummaryPath,
+            outputDirectory: executeOutputDirectory,
+            hardBlockerResolutions: formattedResolutions,
+            executionIteration: executionIteration.toString(),
+            followUpIteration: followUpIteration.toString(),
+          });
+
+          // Execute using AI CLI tool
+          await aiTool.execute(followUpsPrompt);
+        } else {
+          // Hard blockers were already resolved (iteration 0 exists)
+          console.log('\n✅ Hard blockers were already resolved. Continuing with follow-ups...');
+        }
+      }
+    } catch (error) {
+      // If metadata file doesn't exist or can't be read, continue to follow-up loop
+      // This allows the tool to work even if metadata wasn't generated
+      if (!(error instanceof Error && error.message.includes('not found'))) {
+        throw error;
+      }
     }
   }
 
   // Iterative follow-up execution loop
   // Continue executing follow-ups until hasFollowUps is false or max iterations reached
-  let followUpIterationCount = 0;
+  // Start from the correct iteration based on artifacts
+  // Note: followUpIterationCount is already set to the next iteration to execute
 
   while (followUpIterationCount < maxFollowUpIterations) {
     try {
@@ -136,23 +172,30 @@ export async function executePlanWithFollowUps(
         // Format hard blocker resolutions for the template
         const formattedResolutions = formatHardBlockerResolutions(executeMetadata.hardBlockers, blockerResolutions);
 
-        console.log(`\n🔄 Executing follow-ups with hard blocker resolutions (iteration ${formatIteration(followUpIterationCount + 1, maxFollowUpIterations, isDestinyMode)})...`);
+        // Determine which iteration we're executing
+        // If hard blockers exist in the loop, we're executing a follow-up iteration
+        // The iteration number is followUpIterationCount (which is the next iteration to execute)
+        const currentFollowUpIteration = followUpIterationCount;
+        console.log(`\n🔄 Executing follow-ups with hard blocker resolutions (iteration ${formatIteration(currentFollowUpIteration + 1, maxFollowUpIterations, isDestinyMode)})...`);
 
         // Prepare paths for follow-up execution template
-        // Use the previous iteration's summary (or initial summary for first iteration)
-        // If we already did iteration 0, start from there; otherwise start from initial summary
+        // Determine the previous iteration to read from
+        // If we're executing iteration N, we read from iteration N-1
+        // Special case: if we haven't done iteration 0 and this is iteration 1, read from initial summary
         let previousFollowUpIteration: number;
         if (hasDoneIteration0) {
-          // We already did iteration 0, so read from the most recent iteration
-          previousFollowUpIteration = followUpIterationCount === 0 ? 0 : followUpIterationCount;
+          // We've done iteration 0, so previous is followUpIterationCount - 1
+          // If followUpIterationCount is 1, previous is 0
+          previousFollowUpIteration = followUpIterationCount - 1;
         } else {
-          // First iteration in loop, read from initial summary (no follow-up number)
-          previousFollowUpIteration = -1; // Special value to indicate initial summary
+          // Haven't done iteration 0 yet
+          // If this is iteration 1, read from initial summary (-1)
+          // Otherwise, read from previous follow-up iteration
+          previousFollowUpIteration = followUpIterationCount === 1 ? -1 : followUpIterationCount - 1;
         }
         const executionSummaryPath = previousFollowUpIteration === -1
           ? resolve(executeOutputDirectory, `execution-summary-${executionIteration}.md`)
           : resolve(executeOutputDirectory, `execution-summary-${executionIteration}-followup-${previousFollowUpIteration}.md`);
-        const currentFollowUpIteration = hasDoneIteration0 ? followUpIterationCount + 1 : followUpIterationCount + 1;
 
         // Get the execute follow-ups template and interpolate
         const followUpsTemplate = getExecuteFollowUpsTemplate();
@@ -179,23 +222,28 @@ export async function executePlanWithFollowUps(
         break;
       }
 
-      console.log(`\n🔄 Executing follow-ups (iteration ${formatIteration(followUpIterationCount + 1, maxFollowUpIterations, isDestinyMode)})...`);
+      // Determine which iteration we're executing
+      const currentFollowUpIteration = followUpIterationCount;
+      console.log(`\n🔄 Executing follow-ups (iteration ${formatIteration(currentFollowUpIteration + 1, maxFollowUpIterations, isDestinyMode)})...`);
 
       // Prepare paths for follow-up execution template
-      // Use the previous iteration's summary (or initial summary for first iteration)
-      // If we already did iteration 0, start from there; otherwise start from initial summary
+      // Determine the previous iteration to read from
+      // If we're executing iteration N, we read from iteration N-1
+      // Special case: if we haven't done iteration 0 and this is iteration 1, read from initial summary
       let previousFollowUpIteration: number;
       if (hasDoneIteration0) {
-        // We already did iteration 0, so read from the most recent iteration
-        previousFollowUpIteration = followUpIterationCount === 0 ? 0 : followUpIterationCount;
+        // We've done iteration 0, so previous is followUpIterationCount - 1
+        // If followUpIterationCount is 1, previous is 0
+        previousFollowUpIteration = followUpIterationCount - 1;
       } else {
-        // First iteration in loop, read from initial summary (no follow-up number)
-        previousFollowUpIteration = -1; // Special value to indicate initial summary
+        // Haven't done iteration 0 yet
+        // If this is iteration 1, read from initial summary (-1)
+        // Otherwise, read from previous follow-up iteration
+        previousFollowUpIteration = followUpIterationCount === 1 ? -1 : followUpIterationCount - 1;
       }
       const executionSummaryPath = previousFollowUpIteration === -1
         ? resolve(executeOutputDirectory, `execution-summary-${executionIteration}.md`)
         : resolve(executeOutputDirectory, `execution-summary-${executionIteration}-followup-${previousFollowUpIteration}.md`);
-      const currentFollowUpIteration = hasDoneIteration0 ? followUpIterationCount + 1 : followUpIterationCount + 1;
 
       // Get the execute follow-ups template and interpolate
       const followUpsTemplate = getExecuteFollowUpsTemplate();
@@ -566,6 +614,9 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       execIterationCount,
       isDestinyMode
     );
+    
+    // Sync state with artifacts after execution
+    executionState = syncStateWithArtifacts(executionState, executeOutputDirectory, execIterationCount);
     
     // Update state after execution
     executionState = {

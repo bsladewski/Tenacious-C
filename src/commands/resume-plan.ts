@@ -13,6 +13,8 @@ import { trackQAHistory, readQAHistory } from '../utils/track-qa-history';
 import { readExecuteMetadata } from '../utils/read-execute-metadata';
 import { readGapAuditMetadata } from '../utils/read-gap-audit-metadata';
 import { generateFinalSummary } from '../utils/generate-final-summary';
+import { verifyGapAuditArtifacts, verifyPlanFile } from '../utils/scan-execution-artifacts';
+import { syncStateWithArtifacts } from '../utils/sync-state-with-artifacts';
 import { getAnswerQuestionsTemplate } from '../templates/answer-questions.template';
 import { getImprovePlanTemplate } from '../templates/improve-plan.template';
 import { getGapAuditTemplate } from '../templates/gap-audit.template';
@@ -106,8 +108,22 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
     state = updatedState;
   }
   
-  // If we've moved past plan generation, continue with execution
+  // If we've moved past plan generation, sync state with artifacts before continuing
   if (state.phase !== 'plan-generation' && state.phase !== 'plan-revision') {
+    // If we have execution state, sync it with artifacts
+    if (state.execution && state.execution.execIterationCount > 0) {
+      const isInitialExecution = state.execution.execIterationCount === 1;
+      const executeOutputDirectory = isInitialExecution 
+        ? resolve(timestampDirectory, 'execute')
+        : resolve(timestampDirectory, `execute-${state.execution.execIterationCount}`);
+      
+      // Sync state with artifacts before resuming
+      const syncedState = syncStateWithArtifacts(state, executeOutputDirectory, state.execution.execIterationCount);
+      // Always save synced state (function handles comparison internally)
+      saveExecutionState(timestampDirectory, syncedState);
+      state = syncedState;
+    }
+    
     await resumeExecution(state, aiTool, maxFollowUpIterations, execIterations, isDestinyMode);
   }
   
@@ -149,7 +165,8 @@ async function resumePlanGeneration(
   mkdirSync(outputDirectory, { recursive: true });
   
   // Check if plan file exists - if not, we need to generate it first
-  if (!existsSync(planPath)) {
+  const planFileCheck = verifyPlanFile(planPath);
+  if (!planFileCheck.exists) {
     if (!state.planGeneration) {
       // No plan generation state - this is a fresh start
       console.log('\n⚠️  No plan generation state found. Generating initial plan...');
@@ -174,7 +191,7 @@ async function resumePlanGeneration(
       phase: 'plan-revision' as const,
       planGeneration: {
         revisionCount: 0,
-        planPath,
+        planPath: planFileCheck.resolvedPath,
         outputDirectory,
       },
     };
@@ -183,16 +200,23 @@ async function resumePlanGeneration(
     // For now, update the local state reference so we can continue
     state.planGeneration = {
       revisionCount: 0,
-      planPath,
+      planPath: planFileCheck.resolvedPath,
       outputDirectory,
     };
+  }
+  
+  // Verify plan file exists before proceeding
+  const finalPlanCheck = verifyPlanFile(planPath);
+  if (!finalPlanCheck.exists) {
+    console.error(`\n❌ Plan file not found at: ${planPath}\n`);
+    process.exit(1);
   }
   
   // If we still don't have planGeneration state, initialize it
   if (!state.planGeneration) {
     state.planGeneration = {
       revisionCount: 0,
-      planPath,
+      planPath: finalPlanCheck.resolvedPath,
       outputDirectory,
     };
   }
@@ -321,8 +345,25 @@ async function resumeExecution(
   const outputDirectory = resolve(timestampDirectory, 'plan');
   const requirementsPath = resolve(timestampDirectory, 'requirements.txt');
   
-  // Determine current plan path
+  // Determine current plan path and verify it exists
   let currentPlanPath = state.execution?.currentPlanPath || resolve(outputDirectory, 'plan.md');
+  const initialPlanCheck = verifyPlanFile(currentPlanPath);
+  if (!initialPlanCheck.exists) {
+    // Plan file doesn't exist, try to construct correct path
+    console.log(`\n⚠️  Plan file not found at: ${currentPlanPath}`);
+    // Try default plan path
+    const defaultPlanPath = resolve(outputDirectory, 'plan.md');
+    const defaultPlanCheck = verifyPlanFile(defaultPlanPath);
+    if (defaultPlanCheck.exists) {
+      console.log(`   Using default plan path: ${defaultPlanPath}`);
+      currentPlanPath = defaultPlanPath;
+    } else {
+      console.error(`\n❌ Plan file not found. Cannot resume execution.\n`);
+      process.exit(1);
+    }
+  } else {
+    currentPlanPath = initialPlanCheck.resolvedPath;
+  }
   
   // Start from the saved execution iteration, or determine where we are
   let execIterationCount = state.execution?.execIterationCount || 0;
@@ -330,17 +371,203 @@ async function resumeExecution(
   // If we have gap plan state, we've already done at least one execution iteration
   if (state.gapPlan) {
     execIterationCount = state.gapPlan.execIterationCount;
-    currentPlanPath = state.execution?.currentPlanPath || resolve(timestampDirectory, `gap-plan-${execIterationCount}`, `gap-plan-${execIterationCount}.md`);
+    const gapPlanPath = state.execution?.currentPlanPath || resolve(timestampDirectory, `gap-plan-${execIterationCount}`, `gap-plan-${execIterationCount}.md`);
+    const gapPlanCheck = verifyPlanFile(gapPlanPath);
+    if (gapPlanCheck.exists) {
+      currentPlanPath = gapPlanCheck.resolvedPath;
+    } else {
+      console.log(`\n⚠️  Gap plan file not found at: ${gapPlanPath}`);
+      console.log('   Will attempt to locate or regenerate...');
+    }
   } else if (state.gapAudit) {
     execIterationCount = state.gapAudit.execIterationCount;
   } else if (state.execution) {
     execIterationCount = state.execution.execIterationCount;
   }
   
+  // Check if the current execution iteration is complete before moving to the next one
+  // This handles the case where execution was interrupted mid-way through follow-ups
+  let currentIterationCompleted = false;
+  if (execIterationCount > 0) {
+    const isInitialExecution = execIterationCount === 1;
+    const currentExecuteOutputDirectory = isInitialExecution 
+      ? resolve(timestampDirectory, 'execute')
+      : resolve(timestampDirectory, `execute-${execIterationCount}`);
+    
+    // Check if current iteration is complete
+    if (!isExecutionComplete(currentExecuteOutputDirectory)) {
+      // Current iteration is not complete - continue with it
+      console.log(`\n🔄 Continuing execution iteration ${execIterationCount} (follow-ups not yet complete)...`);
+      
+      await executePlanWithFollowUps(
+        currentPlanPath,
+        requirementsPath,
+        currentExecuteOutputDirectory,
+        maxFollowUpIterations,
+        aiTool,
+        execIterationCount,
+        isDestinyMode
+      );
+      
+      // Mark that we've completed this iteration
+      currentIterationCompleted = true;
+      
+      // Sync state with artifacts after execution
+      const syncedState = syncStateWithArtifacts(state, currentExecuteOutputDirectory, execIterationCount);
+      
+      // Update state after execution
+      const updatedState: ExecutionState = {
+        ...syncedState,
+        phase: 'gap-audit' as const,
+        execution: {
+          ...syncedState.execution!,
+          execIterationCount,
+          currentPlanPath,
+          executeOutputDirectory: currentExecuteOutputDirectory,
+        },
+      };
+      saveExecutionState(timestampDirectory, updatedState);
+      state = updatedState;
+      
+      // Continue to gap audit for this iteration (will be handled below)
+    } else {
+      // Current iteration is complete, move to next one
+      execIterationCount++;
+      currentIterationCompleted = true; // Already completed, so we'll process gap audit
+    }
+  } else {
+    // No execution iteration yet, start with first one
+    execIterationCount = 1;
+  }
+  
+  // If we just completed the current iteration, handle gap audit for it before moving to next iterations
+  if (currentIterationCompleted && execIterationCount > 0) {
+    const isInitialExecution = execIterationCount === 1;
+    
+    // Run gap audit for the completed iteration
+    const gapAuditOutputDirectory = isInitialExecution
+      ? resolve(timestampDirectory, 'gap-audit')
+      : resolve(timestampDirectory, `gap-audit-${execIterationCount}`);
+    
+    // Check if gap audit is already complete (verify both metadata and summary file)
+    const gapAuditArtifacts = verifyGapAuditArtifacts(gapAuditOutputDirectory, execIterationCount);
+    let gapAuditComplete = gapAuditArtifacts.isComplete;
+    let gapsIdentified = false;
+    
+    if (gapAuditArtifacts.metadataExists && !gapAuditArtifacts.summaryExists) {
+      // Metadata exists but summary doesn't - this is inconsistent
+      console.log(`\n⚠️  Gap audit metadata exists but summary file is missing for iteration ${execIterationCount}.`);
+      console.log('   Regenerating gap audit...');
+      gapAuditComplete = false;
+    } else if (gapAuditComplete) {
+      try {
+        const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
+        gapsIdentified = gapAuditMetadata.gapsIdentified;
+        console.log(`\n✅ Gap audit for iteration ${execIterationCount} already complete.`);
+      } catch {
+        // If we can't read metadata, treat as incomplete
+        gapAuditComplete = false;
+      }
+    }
+    
+    if (!gapAuditComplete) {
+      console.log('\n🔍 Running gap audit...');
+      mkdirSync(gapAuditOutputDirectory, { recursive: true });
+      
+      const gapAuditTemplate = getGapAuditTemplate();
+      const gapAuditPrompt = interpolateTemplate(gapAuditTemplate, {
+        requirementsPath,
+        planPath: currentPlanPath,
+        outputDirectory: gapAuditOutputDirectory,
+        executionIteration: execIterationCount.toString(),
+      });
+      
+      await aiTool.execute(gapAuditPrompt);
+      console.log('\n✅ Gap audit complete!');
+      
+      // Read gap audit metadata
+      try {
+        const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
+        gapsIdentified = gapAuditMetadata.gapsIdentified;
+      } catch {
+        // Assume gaps were found if we can't read metadata
+        gapsIdentified = true;
+      }
+    }
+    
+    // Update state
+    const auditState: ExecutionState = {
+      ...state,
+      phase: 'gap-plan' as const,
+      gapAudit: {
+        execIterationCount,
+        gapAuditOutputDirectory,
+      },
+    };
+    saveExecutionState(timestampDirectory, auditState);
+    state = auditState;
+    
+    // Check for gaps
+    if (!gapsIdentified) {
+      console.log('\n✅ No gaps identified. Implementation is complete!');
+      return; // Exit early - we're done
+    }
+    
+    // Create gap plan
+    console.log('\n📋 Creating gap closure plan...');
+    
+    const gapPlanOutputDirectory = isInitialExecution
+      ? resolve(timestampDirectory, 'gap-plan')
+      : resolve(timestampDirectory, `gap-plan-${execIterationCount}`);
+    
+    // Check if gap plan already exists and verify the file
+    const gapPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);
+    const planFileCheck = verifyPlanFile(gapPlanPath);
+    if (planFileCheck.exists) {
+      console.log(`\n✅ Gap plan for iteration ${execIterationCount} already exists.`);
+      currentPlanPath = planFileCheck.resolvedPath;
+    } else {
+      mkdirSync(gapPlanOutputDirectory, { recursive: true });
+      
+      const gapAuditPath = resolve(gapAuditOutputDirectory, `gap-audit-summary-${execIterationCount}.md`);
+      const gapPlanTemplate = getGapPlanTemplate();
+      const gapPlanPrompt = interpolateTemplate(gapPlanTemplate, {
+        gapAuditPath,
+        outputDirectory: gapPlanOutputDirectory,
+        executionIteration: execIterationCount.toString(),
+      });
+      
+      await aiTool.execute(gapPlanPrompt);
+      console.log('\n✅ Gap closure plan complete!');
+      
+      currentPlanPath = gapPlanPath;
+    }
+    
+    // Update state for next iteration
+    const gapPlanState: ExecutionState = {
+      ...auditState,
+      phase: 'execution' as const,
+      gapPlan: {
+        execIterationCount,
+        gapPlanOutputDirectory,
+      },
+      execution: {
+        execIterationCount: execIterationCount + 1, // Next iteration
+        currentPlanPath,
+        executeOutputDirectory: '', // Will be set in next iteration
+        followUpIterationCount: 0,
+        hasDoneIteration0: false,
+      },
+    };
+    saveExecutionState(timestampDirectory, gapPlanState);
+    state = gapPlanState;
+    
+    // Move to next iteration
+    execIterationCount++;
+  }
+  
   // Continue execution loop from where we left off
   while (execIterationCount < execIterations) {
-    execIterationCount++;
-    
     const isInitialExecution = execIterationCount === 1;
     const planType = isInitialExecution ? 'initial plan' : 'gap closure plan';
     
@@ -351,11 +578,12 @@ async function resumeExecution(
       : resolve(timestampDirectory, `execute-${execIterationCount}`);
     
     // Check if this execution iteration is already complete
+    let updatedState: ExecutionState;
     if (isExecutionComplete(executeOutputDirectory)) {
       console.log(`\n✅ Execution iteration ${execIterationCount} already completed. Skipping...`);
       
       // Update state and continue to gap audit
-      const updatedState: ExecutionState = {
+      updatedState = {
         ...state,
         phase: 'gap-audit' as const,
         execution: {
@@ -368,53 +596,59 @@ async function resumeExecution(
       };
       saveExecutionState(timestampDirectory, updatedState);
       
-      // Continue to gap audit
-      continue;
-    }
-    
-    // Execute plan with follow-ups
-    await executePlanWithFollowUps(
-      currentPlanPath,
-      requirementsPath,
-      executeOutputDirectory,
-      maxFollowUpIterations,
-      aiTool,
-      execIterationCount,
-      isDestinyMode
-    );
-    
-    // Update state after execution
-    const updatedState: ExecutionState = {
-      ...state,
-      phase: 'gap-audit' as const,
-      execution: {
-        execIterationCount,
+      // Continue to gap audit (will be handled below)
+    } else {
+      // Execute plan with follow-ups
+      await executePlanWithFollowUps(
         currentPlanPath,
+        requirementsPath,
         executeOutputDirectory,
-        followUpIterationCount: 0,
-        hasDoneIteration0: false,
-      },
-    };
-    saveExecutionState(timestampDirectory, updatedState);
+        maxFollowUpIterations,
+        aiTool,
+        execIterationCount,
+        isDestinyMode
+      );
+      
+      // Sync state with artifacts after execution
+      const syncedState = syncStateWithArtifacts(state, executeOutputDirectory, execIterationCount);
+      
+      // Update state after execution
+      updatedState = {
+        ...syncedState,
+        phase: 'gap-audit' as const,
+        execution: {
+          ...syncedState.execution!,
+          execIterationCount,
+          currentPlanPath,
+          executeOutputDirectory,
+        },
+      };
+      saveExecutionState(timestampDirectory, updatedState);
+    }
     
     // Run gap audit
     const gapAuditOutputDirectory = isInitialExecution
       ? resolve(timestampDirectory, 'gap-audit')
       : resolve(timestampDirectory, `gap-audit-${execIterationCount}`);
     
-    // Check if gap audit is already complete
-    const gapAuditMetadataPath = resolve(gapAuditOutputDirectory, 'gap-audit-metadata.json');
-    let gapAuditComplete = false;
+    // Check if gap audit is already complete (verify both metadata and summary file)
+    const gapAuditArtifacts = verifyGapAuditArtifacts(gapAuditOutputDirectory, execIterationCount);
+    let gapAuditComplete = gapAuditArtifacts.isComplete;
     let gapsIdentified = false;
     
-    if (existsSync(gapAuditMetadataPath)) {
+    if (gapAuditArtifacts.metadataExists && !gapAuditArtifacts.summaryExists) {
+      // Metadata exists but summary doesn't - this is inconsistent
+      console.log(`\n⚠️  Gap audit metadata exists but summary file is missing for iteration ${execIterationCount}.`);
+      console.log('   Regenerating gap audit...');
+      gapAuditComplete = false;
+    } else if (gapAuditComplete) {
       try {
         const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
-        gapAuditComplete = true;
         gapsIdentified = gapAuditMetadata.gapsIdentified;
         console.log(`\n✅ Gap audit for iteration ${execIterationCount} already complete.`);
       } catch {
-        // Continue with gap audit
+        // If we can't read metadata, treat as incomplete
+        gapAuditComplete = false;
       }
     }
     
@@ -465,11 +699,12 @@ async function resumeExecution(
       ? resolve(timestampDirectory, 'gap-plan')
       : resolve(timestampDirectory, `gap-plan-${execIterationCount}`);
     
-    // Check if gap plan already exists
+    // Check if gap plan already exists and verify the file
     const gapPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);
-    if (existsSync(gapPlanPath)) {
+    const planFileCheck = verifyPlanFile(gapPlanPath);
+    if (planFileCheck.exists) {
       console.log(`\n✅ Gap plan for iteration ${execIterationCount} already exists.`);
-      currentPlanPath = gapPlanPath;
+      currentPlanPath = planFileCheck.resolvedPath;
     } else {
       console.log('\n📋 Creating gap closure plan...');
       mkdirSync(gapPlanOutputDirectory, { recursive: true });
