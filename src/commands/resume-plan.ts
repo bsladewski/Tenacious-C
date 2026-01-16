@@ -99,7 +99,17 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
       return; // Exit early, user should resume again after answering questions
     }
     
-    // Plan generation is complete - update state and continue to execution
+    // Plan generation is complete - log summary and update state
+    console.log(`\n✅ Plan complete! Confidence: ${metadata.confidence}% (threshold: ${planConfidenceThreshold}%)`);
+    
+    // Log plan summary if available
+    if (metadata.summary) {
+      console.log('\n📋 Plan Summary:');
+      console.log('───────────────────────────────────────────────────────────────');
+      console.log(metadata.summary);
+      console.log('───────────────────────────────────────────────────────────────');
+    }
+    
     const updatedState = {
       ...state,
       phase: 'execution' as const,
@@ -489,9 +499,30 @@ async function resumeExecution(
       try {
         const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
         gapsIdentified = gapAuditMetadata.gapsIdentified;
+        
+        // Log gap audit summary if available
+        if (gapAuditMetadata.summary) {
+          console.log('\n🔍 Gap Audit Summary:');
+          console.log('───────────────────────────────────────────────────────────────');
+          console.log(gapAuditMetadata.summary);
+          console.log('───────────────────────────────────────────────────────────────');
+        }
       } catch {
         // Assume gaps were found if we can't read metadata
         gapsIdentified = true;
+      }
+    } else if (gapAuditComplete) {
+      // Gap audit was already complete, but we should still log the summary
+      try {
+        const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
+        if (gapAuditMetadata.summary) {
+          console.log('\n🔍 Gap Audit Summary:');
+          console.log('───────────────────────────────────────────────────────────────');
+          console.log(gapAuditMetadata.summary);
+          console.log('───────────────────────────────────────────────────────────────');
+        }
+      } catch {
+        // If we can't read metadata, that's okay
       }
     }
     
@@ -671,9 +702,30 @@ async function resumeExecution(
       try {
         const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
         gapsIdentified = gapAuditMetadata.gapsIdentified;
+        
+        // Log gap audit summary if available
+        if (gapAuditMetadata.summary) {
+          console.log('\n🔍 Gap Audit Summary:');
+          console.log('───────────────────────────────────────────────────────────────');
+          console.log(gapAuditMetadata.summary);
+          console.log('───────────────────────────────────────────────────────────────');
+        }
       } catch {
         // Assume gaps were found if we can't read metadata
         gapsIdentified = true;
+      }
+    } else if (gapAuditComplete) {
+      // Gap audit was already complete, but we should still log the summary
+      try {
+        const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
+        if (gapAuditMetadata.summary) {
+          console.log('\n🔍 Gap Audit Summary:');
+          console.log('───────────────────────────────────────────────────────────────');
+          console.log(gapAuditMetadata.summary);
+          console.log('───────────────────────────────────────────────────────────────');
+        }
+      } catch {
+        // If we can't read metadata, that's okay
       }
     }
     

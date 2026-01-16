@@ -221,7 +221,7 @@ async function main() {
     maxRevisions = Number.MAX_SAFE_INTEGER;
     maxFollowUpIterations = Number.MAX_SAFE_INTEGER;
     execIterations = Number.MAX_SAFE_INTEGER;
-    console.log('\n🌟 The Prompt of Destiny activated! All iteration limits overridden. Continuing until truly done...\n');
+    console.log('\n🌟 The Prompt of Destiny activated! All iteration limits overridden. Continuing until truly done...');
   }
 
   // If resume is set, input is not required

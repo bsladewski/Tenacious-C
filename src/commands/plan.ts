@@ -80,6 +80,19 @@ export async function executePlanWithFollowUps(
     await aiTool.execute(executePrompt);
 
     console.log('\n✅ Plan execution complete!');
+    
+    // Log initial execution summary if available
+    try {
+      const initialExecuteMetadata = readExecuteMetadata(executeOutputDirectory);
+      if (initialExecuteMetadata.summary) {
+        console.log('\n📝 Execution Summary:');
+        console.log('───────────────────────────────────────────────────────────────');
+        console.log(initialExecuteMetadata.summary);
+        console.log('───────────────────────────────────────────────────────────────');
+      }
+    } catch {
+      // If we can't read metadata, that's okay - continue
+    }
   } else {
     console.log('\n✅ Initial execution already completed. Skipping...');
   }
@@ -285,6 +298,14 @@ export async function executePlanWithFollowUps(
         console.log('\n✅ All follow-ups complete!');
       } else {
         console.log('\n✅ Follow-up iterations complete.');
+      }
+      
+      // Log execution summary if available
+      if (finalExecuteMetadata.summary) {
+        console.log('\n📝 Execution Summary:');
+        console.log('───────────────────────────────────────────────────────────────');
+        console.log(finalExecuteMetadata.summary);
+        console.log('───────────────────────────────────────────────────────────────');
       }
     } catch {
       // If we can't read metadata, that's okay - we've completed the iterations
@@ -556,6 +577,14 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     try {
       const finalMetadata = readPlanMetadata(outputDirectory);
       console.log(`\n✅ Plan complete! Confidence: ${finalMetadata.confidence}% (threshold: ${planConfidenceThreshold}%)`);
+      
+      // Log plan summary if available
+      if (finalMetadata.summary) {
+        console.log('\n📋 Plan Summary:');
+        console.log('───────────────────────────────────────────────────────────────');
+        console.log(finalMetadata.summary);
+        console.log('───────────────────────────────────────────────────────────────');
+      }
     } catch {
       // If we can't read metadata, that's okay - we've completed the revisions
       console.log('\n✅ Plan revisions complete.');
@@ -649,6 +678,19 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     await aiTool.execute(gapAuditPrompt);
     
     console.log('\n✅ Gap audit complete!');
+    
+    // Log gap audit summary if available
+    try {
+      const gapAuditMetadata = readGapAuditMetadata(gapAuditOutputDirectory);
+      if (gapAuditMetadata.summary) {
+        console.log('\n🔍 Gap Audit Summary:');
+        console.log('───────────────────────────────────────────────────────────────');
+        console.log(gapAuditMetadata.summary);
+        console.log('───────────────────────────────────────────────────────────────');
+      }
+    } catch {
+      // If we can't read metadata, that's okay - continue
+    }
     
     // Update state after gap audit
     executionState = {
