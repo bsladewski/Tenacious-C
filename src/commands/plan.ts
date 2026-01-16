@@ -49,6 +49,7 @@ function formatIteration(current: number, max: number, isDestinyMode: boolean): 
  * @param aiTool - AI CLI tool instance
  * @param executionIteration - Current execution iteration number (for display)
  * @param isDestinyMode - Whether prompt of destiny mode is active
+ * @param executeModel - Optional model name to use for execution and follow-ups
  */
 export async function executePlanWithFollowUps(
   planPath: string,
@@ -57,7 +58,8 @@ export async function executePlanWithFollowUps(
   maxFollowUpIterations: number,
   aiTool: AICliTool,
   executionIteration: number,
-  isDestinyMode: boolean
+  isDestinyMode: boolean,
+  executeModel?: string | null
 ): Promise<void> {
   // Ensure execution output directory exists
   mkdirSync(executeOutputDirectory, { recursive: true });
@@ -76,8 +78,8 @@ export async function executePlanWithFollowUps(
       executionIteration: executionIteration.toString(),
     });
 
-    // Execute using AI CLI tool
-    await aiTool.execute(executePrompt);
+    // Execute using AI CLI tool with execute model if specified
+    await aiTool.execute(executePrompt, executeModel || undefined);
 
     console.log('\n✅ Plan execution complete!');
     
@@ -150,8 +152,8 @@ export async function executePlanWithFollowUps(
             followUpIteration: followUpIteration.toString(),
           });
 
-          // Execute using AI CLI tool
-          await aiTool.execute(followUpsPrompt);
+          // Execute using AI CLI tool with execute model if specified
+          await aiTool.execute(followUpsPrompt, executeModel || undefined);
         } else {
           // Hard blockers were already resolved (iteration 0 exists)
           console.log('\n✅ Hard blockers were already resolved. Continuing with follow-ups...');
@@ -220,8 +222,8 @@ export async function executePlanWithFollowUps(
           followUpIteration: currentFollowUpIteration.toString(),
         });
 
-      // Execute using AI CLI tool
-      await aiTool.execute(followUpsPrompt);
+      // Execute using AI CLI tool with execute model if specified
+      await aiTool.execute(followUpsPrompt, executeModel || undefined);
 
         followUpIterationCount++;
 
@@ -268,8 +270,8 @@ export async function executePlanWithFollowUps(
         followUpIteration: currentFollowUpIteration.toString(),
       });
 
-      // Execute using AI CLI tool
-      await aiTool.execute(followUpsPrompt);
+      // Execute using AI CLI tool with execute model if specified
+      await aiTool.execute(followUpsPrompt, executeModel || undefined);
 
       followUpIterationCount++;
 
@@ -325,8 +327,11 @@ export async function executePlanWithFollowUps(
  * @param specifiedCliTool - CLI tool type specified via --cli-tool argument, or null
  * @param previewPlanFlag - Whether to preview the plan before execution
  * @param resumeFlag - Whether to resume from a previous run
+ * @param planModel - Optional model name to use for plan generation and revisions
+ * @param executeModel - Optional model name to use for plan execution and follow-ups
+ * @param auditModel - Optional model name to use for gap audits
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null): Promise<void> {
   // If resume flag is set, find and resume the latest run
   if (resumeFlag) {
     const tenaciousCDir = resolve(process.cwd(), '.tenacious-c');
@@ -356,6 +361,9 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       isDestinyMode,
       cliTool: specifiedCliTool ?? state.config.cliTool, // Use new CLI tool if specified, otherwise keep saved
       previewPlan: previewPlanFlag,
+      planModel: planModel ?? state.config.planModel, // Use new model if specified, otherwise keep saved
+      executeModel: executeModel ?? state.config.executeModel, // Use new model if specified, otherwise keep saved
+      auditModel: auditModel ?? state.config.auditModel, // Use new model if specified, otherwise keep saved
     };
     
     // Update state with overridden config
@@ -403,6 +411,9 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       isDestinyMode,
       cliTool: specifiedCliTool,
       previewPlan: previewPlanFlag,
+      planModel,
+      executeModel,
+      auditModel,
     },
     'plan-generation'
   );
@@ -421,8 +432,8 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   // Generate initial plan
   console.log('\n📋 Generating initial plan...');
   
-  // Execute using AI CLI tool
-  await aiTool.execute(prompt);
+  // Execute using AI CLI tool with plan model if specified
+  await aiTool.execute(prompt, planModel || undefined);
 
   // Update state after initial plan generation
   executionState = {
@@ -507,7 +518,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         });
         
         console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(answerPrompt);
+        await aiTool.execute(answerPrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -536,7 +547,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         });
         
         console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(improvePrompt);
+        await aiTool.execute(improvePrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -641,7 +652,8 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       maxFollowUpIterations,
       aiTool,
       execIterationCount,
-      isDestinyMode
+      isDestinyMode,
+      executeModel
     );
     
     // Sync state with artifacts after execution
@@ -674,8 +686,8 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       executionIteration: execIterationCount.toString(),
     });
     
-    // Execute using AI CLI tool
-    await aiTool.execute(gapAuditPrompt);
+    // Execute using AI CLI tool with audit model if specified
+    await aiTool.execute(gapAuditPrompt, auditModel || undefined);
     
     console.log('\n✅ Gap audit complete!');
     
@@ -735,8 +747,8 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         executionIteration: execIterationCount.toString(),
       });
       
-      // Execute using AI CLI tool
-      await aiTool.execute(gapPlanPrompt);
+      // Execute using AI CLI tool with plan model if specified
+      await aiTool.execute(gapPlanPrompt, planModel || undefined);
       
       console.log('\n✅ Gap closure plan complete!');
       
@@ -781,7 +793,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
           executionIteration: execIterationCount.toString(),
         });
         
-        await aiTool.execute(gapPlanPrompt);
+        await aiTool.execute(gapPlanPrompt, planModel || undefined);
         console.log('\n✅ Gap closure plan complete!');
         
         currentPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);

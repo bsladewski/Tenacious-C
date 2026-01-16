@@ -14,6 +14,9 @@ export function createExecutionState(
     isDestinyMode: boolean;
     cliTool: CliToolType | null;
     previewPlan: boolean;
+    planModel: string | null;
+    executeModel: string | null;
+    auditModel: string | null;
   },
   phase: ExecutionState['phase'] = 'plan-generation'
 ): ExecutionState {

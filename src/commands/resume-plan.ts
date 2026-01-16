@@ -51,7 +51,7 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
   
   // Resume based on phase
   if (state.phase === 'plan-generation' || state.phase === 'plan-revision') {
-    await resumePlanGeneration(state, aiTool, maxRevisions, planConfidenceThreshold, isDestinyMode);
+    await resumePlanGeneration(state, aiTool, maxRevisions, planConfidenceThreshold, isDestinyMode, config.planModel);
     
     // Reload state in case it was updated during plan generation
     const reloadedState = loadExecutionState(timestampDirectory);
@@ -134,7 +134,7 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
       state = syncedState;
     }
     
-    await resumeExecution(state, aiTool, maxFollowUpIterations, execIterations, isDestinyMode);
+    await resumeExecution(state, aiTool, maxFollowUpIterations, execIterations, isDestinyMode, config.executeModel, config.auditModel, config.planModel);
   }
   
   // Mark as complete and generate final summary
@@ -165,7 +165,8 @@ async function resumePlanGeneration(
   aiTool: AICliTool,
   maxRevisions: number,
   planConfidenceThreshold: number,
-  isDestinyMode: boolean
+  isDestinyMode: boolean,
+  planModel: string | null
 ): Promise<void> {
   const { timestampDirectory } = state;
   const outputDirectory = resolve(timestampDirectory, 'plan');
@@ -192,8 +193,8 @@ async function resumePlanGeneration(
       requirements: state.requirements,
     });
     
-    // Execute using AI CLI tool
-    await aiTool.execute(prompt);
+    // Execute using AI CLI tool with plan model if specified
+    await aiTool.execute(prompt, planModel || undefined);
     
     // Update state after initial plan generation
     const updatedState = {
@@ -263,7 +264,7 @@ async function resumePlanGeneration(
         });
         
         console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(answerPrompt);
+        await aiTool.execute(answerPrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -290,7 +291,7 @@ async function resumePlanGeneration(
         });
         
         console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(improvePrompt);
+        await aiTool.execute(improvePrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -349,7 +350,10 @@ async function resumeExecution(
   aiTool: AICliTool,
   maxFollowUpIterations: number,
   execIterations: number,
-  isDestinyMode: boolean
+  isDestinyMode: boolean,
+  executeModel: string | null,
+  auditModel: string | null,
+  planModel: string | null
 ): Promise<void> {
   const { timestampDirectory } = state;
   const outputDirectory = resolve(timestampDirectory, 'plan');
@@ -416,7 +420,8 @@ async function resumeExecution(
         maxFollowUpIterations,
         aiTool,
         execIterationCount,
-        isDestinyMode
+        isDestinyMode,
+        executeModel
       );
       
       // Mark that we've completed this iteration
@@ -492,7 +497,7 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapAuditPrompt);
+      await aiTool.execute(gapAuditPrompt, auditModel || undefined);
       console.log('\n✅ Gap audit complete!');
       
       // Read gap audit metadata
@@ -568,7 +573,7 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapPlanPrompt);
+      await aiTool.execute(gapPlanPrompt, planModel || undefined);
       console.log('\n✅ Gap closure plan complete!');
       
       currentPlanPath = gapPlanPath;
@@ -637,7 +642,8 @@ async function resumeExecution(
         maxFollowUpIterations,
         aiTool,
         execIterationCount,
-        isDestinyMode
+        isDestinyMode,
+        executeModel
       );
       
       // Sync state with artifacts after execution
@@ -695,7 +701,7 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapAuditPrompt);
+      await aiTool.execute(gapAuditPrompt, auditModel || undefined);
       console.log('\n✅ Gap audit complete!');
       
       // Read gap audit metadata
@@ -769,7 +775,7 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapPlanPrompt);
+      await aiTool.execute(gapPlanPrompt, planModel || undefined);
       console.log('\n✅ Gap closure plan complete!');
       
       currentPlanPath = gapPlanPath;

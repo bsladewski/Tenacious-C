@@ -65,6 +65,9 @@ export interface ExecutionState {
     isDestinyMode: boolean;
     cliTool: CliToolType | null;
     previewPlan: boolean;
+    planModel: string | null;
+    executeModel: string | null;
+    auditModel: string | null;
   };
   
   /**

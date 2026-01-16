@@ -30,7 +30,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--preview-plan] [--resume] [--the-prompt-of-destiny]');
+    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--plan-model <model>] [--execute-model <model>] [--audit-model <model>] [--preview-plan] [--resume] [--the-prompt-of-destiny]');
     console.error('');
     console.error('Examples:');
     console.error('  tenacious-c "Add user authentication"');
@@ -42,6 +42,7 @@ async function main() {
     console.error('  tenacious-c "Add user authentication" --cli-tool copilot');
     console.error('  tenacious-c "Add user authentication" --cli-tool cursor');
     console.error('  tenacious-c "Add user authentication" --cli-tool claude');
+    console.error('  tenacious-c "Add user authentication" --plan-model sonnet-4.5 --execute-model opus-4.5-thinking --audit-model gpt-5.2-codex');
     console.error('  tenacious-c "Add user authentication" --preview-plan');
     console.error('  tenacious-c --resume');
     console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
@@ -52,6 +53,9 @@ async function main() {
     console.error('  --max-follow-up-iterations <number>  Maximum number of follow-up execution iterations (default: 10)');
     console.error('  --exec-iterations <number>          Maximum number of plan-based execution iterations (default: 5)');
     console.error('  --cli-tool <codex|copilot|cursor|claude>  CLI tool to use (default: auto-detect or prompt)');
+    console.error('  --plan-model <model>               Model to use for plan generation and revisions (optional)');
+    console.error('  --execute-model <model>            Model to use for plan execution and follow-ups (optional)');
+    console.error('  --audit-model <model>               Model to use for gap audits (optional)');
     console.error('  --preview-plan                      Preview the initial plan before execution');
     console.error('  --resume                            Resume the most recent interrupted run');
     console.error('  --the-prompt-of-destiny             Override all iteration limits - continue until truly done');
@@ -66,6 +70,9 @@ async function main() {
   let execIterations = 5; // Default value
   let thePromptOfDestiny = false; // Default value
   let cliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
+  let planModel: string | null = null; // Default value
+  let executeModel: string | null = null; // Default value
+  let auditModel: string | null = null; // Default value
   let previewPlan = false; // Default value
   let resume = false; // Default value
   
@@ -200,6 +207,54 @@ async function main() {
         process.exit(1);
       }
       cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+    } else if (arg === '--plan-model') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --plan-model requires a model name value');
+        process.exit(1);
+      }
+      planModel = value;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--plan-model=')) {
+      // Handle --plan-model=sonnet-4.5 format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --plan-model= requires a model name value');
+        process.exit(1);
+      }
+      planModel = value;
+    } else if (arg === '--execute-model') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --execute-model requires a model name value');
+        process.exit(1);
+      }
+      executeModel = value;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--execute-model=')) {
+      // Handle --execute-model=opus-4.5-thinking format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --execute-model= requires a model name value');
+        process.exit(1);
+      }
+      executeModel = value;
+    } else if (arg === '--audit-model') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --audit-model requires a model name value');
+        process.exit(1);
+      }
+      auditModel = value;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--audit-model=')) {
+      // Handle --audit-model=gpt-5.2-codex format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --audit-model= requires a model name value');
+        process.exit(1);
+      }
+      auditModel = value;
     } else if (arg === '--preview-plan') {
       previewPlan = true;
     } else if (arg === '--resume') {
@@ -232,7 +287,7 @@ async function main() {
 
   try {
     // If resume is set, input is ignored (can be empty string)
-    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume);
+    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume, planModel, executeModel, auditModel);
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

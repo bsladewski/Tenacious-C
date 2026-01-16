@@ -16,7 +16,7 @@ export class CopilotCliTool implements AICliTool {
     this.workingDirectory = workingDirectory;
   }
 
-  async execute(prompt: string): Promise<void> {
+  async execute(prompt: string, model?: string): Promise<void> {
     const spinner = ora('Running Copilot...').start();
 
     return new Promise((resolve, reject) => {
@@ -30,6 +30,11 @@ export class CopilotCliTool implements AICliTool {
         prompt,
         '--yolo',
       ];
+
+      // Add model flag if specified
+      if (model) {
+        args.push('--model', model);
+      }
 
       const child = spawn(this.copilotPath, args, {
         stdio: ['ignore', 'pipe', 'pipe'], // Suppress stdin, capture stdout/stderr

@@ -16,7 +16,7 @@ export class ClaudeCliTool implements AICliTool {
     this.workingDirectory = workingDirectory;
   }
 
-  async execute(prompt: string): Promise<void> {
+  async execute(prompt: string, model?: string): Promise<void> {
     const spinner = ora('Running Claude...').start();
 
     return new Promise((resolve, reject) => {
@@ -28,6 +28,11 @@ export class ClaudeCliTool implements AICliTool {
         prompt,
         '--dangerously-skip-permissions',
       ];
+
+      // Add model flag if specified
+      if (model) {
+        args.push('--model', model);
+      }
 
       const child = spawn(this.claudePath, args, {
         stdio: ['ignore', 'pipe', 'pipe'], // Suppress stdin, capture stdout/stderr
