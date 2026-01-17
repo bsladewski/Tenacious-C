@@ -68,6 +68,9 @@ export interface ExecutionState {
     planModel: string | null;
     executeModel: string | null;
     auditModel: string | null;
+    planCliTool: CliToolType | null;
+    executeCliTool: CliToolType | null;
+    auditCliTool: CliToolType | null;
   };
   
   /**

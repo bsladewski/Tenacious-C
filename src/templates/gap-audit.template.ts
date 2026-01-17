@@ -107,8 +107,14 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
    - **Note:** This is execution iteration {{executionIteration}} - use this filename for full history tracking
 
 2. **Gap Audit Metadata JSON:** \`{{outputDirectory}}/gap-audit-metadata.json\`
-   - This file MUST conform to the exact schema provided below
+   - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the gap audit summary. It MUST contain ONLY these top-level keys: \`gapsIdentified\`, \`summary\`. Do NOT add any other keys.
+   - **CRITICAL - VALID JSON ONLY:** The file MUST be valid JSON parseable by \`JSON.parse()\`. No markdown code fences, no comments, no extra text before or after the JSON object.
    - Set \`gapsIdentified\` to \`true\` if any gaps were found, \`false\` otherwise
+   - **CRITICAL - VALIDATION REQUIRED:** After writing \`gap-audit-metadata.json\`, you MUST run this validation command:
+     \`\`\`bash
+     node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/gap-audit-metadata.json','utf8')); console.log('gap-audit-metadata.json parses')"
+     \`\`\`
+     If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
 
 **Gap Audit Summary Structure** (for \`gap-audit-summary-{{executionIteration}}.md\`):
 
@@ -135,6 +141,21 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 - <total number of gaps identified>
 \`\`\`
 
+**Gap Audit Metadata JSON Requirements:**
+
+**CRITICAL - ALLOWED KEYS ONLY:**
+- \`gap-audit-metadata.json\` is NOT a JSON version of the gap audit summary.
+- It MUST contain ONLY these top-level keys: \`gapsIdentified\`, \`summary\`.
+- It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
+
+**Example gap-audit-metadata.json:**
+\`\`\`json
+{
+  "gapsIdentified": false,
+  "summary": "Plain text 1–2 paragraph summary."
+}
+\`\`\`
+
 **Gap Audit Metadata JSON Schema:**
 
 \`\`\`json
@@ -148,7 +169,15 @@ ${metadataSchema}
 - The \`summary\` field must contain a brief terminal-friendly summary (1-2 paragraphs worth of text) of the audit results
   - Use plain text (no markdown formatting)
   - Suitable for terminal display
-  - Summarize what was audited, the overall assessment, and whether gaps were found (and if so, a brief overview of the types of gaps)`,
+  - Summarize what was audited, the overall assessment, and whether gaps were found (and if so, a brief overview of the types of gaps)
+  - Keep it concise (max 3000 characters) - do NOT dump the full gap audit summary here
+
+**CRITICAL - JSON VALIDATION:**
+After writing \`gap-audit-metadata.json\`, you MUST run this validation command:
+\`\`\`bash
+node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/gap-audit-metadata.json','utf8')); console.log('gap-audit-metadata.json parses')"
+\`\`\`
+If parsing fails, you MUST fix the file and re-run the validation until it succeeds.`,
     description: 'Template for auditing implementation completeness and quality',
     requiredVariables: ['requirementsPath', 'planPath', 'outputDirectory', 'executionIteration'],
   };

@@ -70,7 +70,29 @@ Determine whether the input is:
 - You MUST output **two files** with exact filenames:
   1. **Plan markdown file:** \`{{outputDirectory}}/plan.md\`
   2. **Metadata JSON file:** \`{{outputDirectory}}/plan-metadata.json\`
-     - This file MUST conform to the exact schema provided below
+     - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the plan. It MUST contain ONLY these top-level keys: \`confidence\`, \`openQuestions\`, \`summary\`. Do NOT add any other keys.
+     - **CRITICAL - VALID JSON ONLY:** The file MUST be valid JSON parseable by \`JSON.parse()\`. No markdown code fences, no comments, no extra text before or after the JSON object.
+     - **CRITICAL - VALIDATION REQUIRED:** After writing \`plan-metadata.json\`, you MUST run this validation command:
+       \`\`\`bash
+       node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/plan-metadata.json','utf8')); console.log('plan-metadata.json parses')"
+       \`\`\`
+       If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
+
+**Plan Metadata JSON Requirements:**
+
+**CRITICAL - ALLOWED KEYS ONLY:**
+- \`plan-metadata.json\` is NOT a JSON version of the plan.
+- It MUST contain ONLY these top-level keys: \`confidence\`, \`openQuestions\`, \`summary\`.
+- It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
+
+**Example plan-metadata.json:**
+\`\`\`json
+{
+  "confidence": 80,
+  "openQuestions": [],
+  "summary": "Plain text 1–2 paragraph summary."
+}
+\`\`\`
 
 **Metadata JSON Schema:**
 
@@ -82,11 +104,19 @@ The metadata file contains:
 - \`confidence\`: A number (0-100) representing your confidence in the plan's completeness and accuracy
 - \`openQuestions\`: An array of questions that need clarification. **Each question MUST include at least 2 suggested answers** in the \`suggestedAnswers\` array to enable interactive selection.
 - \`summary\`: A brief terminal-friendly summary (1-2 paragraphs worth of text) of what was planned. Use plain text (no markdown formatting), suitable for terminal display, summarizing the key aspects of the plan: what will be implemented, main phases, and important decisions.
+  - Keep it concise (max 3000 characters) - do NOT dump the full plan here
 
 **CRITICAL:** 
 - Open questions should be included in the metadata JSON file, NOT in the plan markdown file.
 - **Every open question MUST have at least 2 suggested answers** - this is required for the interactive prompt system.
 - Suggested answers should be concise, distinct options that cover the main possibilities for answering the question.
+
+**CRITICAL - JSON VALIDATION:**
+After writing \`plan-metadata.json\`, you MUST run this validation command:
+\`\`\`bash
+node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/plan-metadata.json','utf8')); console.log('plan-metadata.json parses')"
+\`\`\`
+If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
 
 ---
 

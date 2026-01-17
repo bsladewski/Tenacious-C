@@ -39,6 +39,7 @@ export interface OpenQuestion {
 export const planMetadataJsonSchema = {
   type: 'object',
   required: ['confidence', 'openQuestions', 'summary'],
+  additionalProperties: false,
   properties: {
     confidence: {
       type: 'number',
@@ -48,18 +49,22 @@ export const planMetadataJsonSchema = {
     },
     openQuestions: {
       type: 'array',
+      default: [],
       items: {
         type: 'object',
         required: ['question'],
+        additionalProperties: false,
         properties: {
           question: {
             type: 'string',
+            minLength: 1,
             description: 'The question that needs to be answered',
           },
           suggestedAnswers: {
             type: 'array',
             items: {
               type: 'string',
+              minLength: 1,
             },
             description: 'Suggested answers or options for the question',
           },
@@ -69,6 +74,8 @@ export const planMetadataJsonSchema = {
     },
     summary: {
       type: 'string',
+      minLength: 1,
+      maxLength: 3000,
       description: 'Brief terminal-friendly summary of what was planned (1-2 paragraphs worth of text). Plain text, suitable for terminal display, summarizing the key aspects of the plan.',
     },
   },

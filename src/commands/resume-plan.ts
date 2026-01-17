@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { AICliTool } from '../interfaces/ai-cli-tool';
-import { getCliTool } from '../utils/get-cli-tool';
+import { getCliTool, getCliToolForAction } from '../utils/get-cli-tool';
+import { CliToolType } from '../utils/cli-tool-preference';
 import { loadExecutionState } from '../utils/load-execution-state';
 import { saveExecutionState } from '../utils/save-execution-state';
 import { createExecutionState } from '../utils/create-execution-state';
@@ -37,9 +37,6 @@ function formatIteration(current: number, max: number, isDestinyMode: boolean): 
 export async function resumePlan(state: ExecutionState): Promise<void> {
   console.log(`\n🔄 Resuming execution from ${state.phase} phase...`);
   
-  // Get the CLI tool (use saved preference or auto-detect)
-  const aiTool = await getCliTool(state.config.cliTool);
-  
   const { timestampDirectory, config } = state;
   const {
     maxRevisions,
@@ -51,7 +48,7 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
   
   // Resume based on phase
   if (state.phase === 'plan-generation' || state.phase === 'plan-revision') {
-    await resumePlanGeneration(state, aiTool, maxRevisions, planConfidenceThreshold, isDestinyMode, config.planModel);
+    await resumePlanGeneration(state, config.cliTool, maxRevisions, planConfidenceThreshold, isDestinyMode, config.planModel, config.planCliTool);
     
     // Reload state in case it was updated during plan generation
     const reloadedState = loadExecutionState(timestampDirectory);
@@ -134,7 +131,7 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
       state = syncedState;
     }
     
-    await resumeExecution(state, aiTool, maxFollowUpIterations, execIterations, isDestinyMode, config.executeModel, config.auditModel, config.planModel);
+    await resumeExecution(state, config.cliTool, maxFollowUpIterations, execIterations, isDestinyMode, config.executeModel, config.auditModel, config.planModel, config.planCliTool, config.executeCliTool, config.auditCliTool);
   }
   
   // Mark as complete and generate final summary
@@ -147,9 +144,11 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
   saveExecutionState(timestampDirectory, finalState);
   
   // Generate and display final summary
+  // Use default tool for summary generation
   console.log('\n📊 Generating execution summary...\n');
   try {
-    const summary = await generateFinalSummary(timestampDirectory, aiTool);
+    const defaultTool = await getCliTool(config.cliTool);
+    const summary = await generateFinalSummary(timestampDirectory, defaultTool);
     console.log(summary);
   } catch (error) {
     console.warn(`\n⚠️  Could not generate final summary: ${error instanceof Error ? error.message : String(error)}`);
@@ -162,11 +161,12 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
  */
 async function resumePlanGeneration(
   state: ExecutionState,
-  aiTool: AICliTool,
+  defaultCliTool: CliToolType | null,
   maxRevisions: number,
   planConfidenceThreshold: number,
   isDestinyMode: boolean,
-  planModel: string | null
+  planModel: string | null,
+  planCliTool: CliToolType | null
 ): Promise<void> {
   const { timestampDirectory } = state;
   const outputDirectory = resolve(timestampDirectory, 'plan');
@@ -193,8 +193,11 @@ async function resumePlanGeneration(
       requirements: state.requirements,
     });
     
+    // Get the appropriate CLI tool for plan operations
+    const planTool = await getCliToolForAction('plan', planCliTool, defaultCliTool);
+    
     // Execute using AI CLI tool with plan model if specified
-    await aiTool.execute(prompt, planModel || undefined);
+    await planTool.execute(prompt, planModel || undefined);
     
     // Update state after initial plan generation
     const updatedState = {
@@ -263,8 +266,11 @@ async function resumePlanGeneration(
           qaHistory: qaHistory || '',
         });
         
+        // Get the appropriate CLI tool for plan operations
+        const planTool = await getCliToolForAction('plan', planCliTool, defaultCliTool);
+        
         console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(answerPrompt, planModel || undefined);
+        await planTool.execute(answerPrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -290,8 +296,11 @@ async function resumePlanGeneration(
           outputDirectory,
         });
         
+        // Get the appropriate CLI tool for plan operations
+        const planTool = await getCliToolForAction('plan', planCliTool, defaultCliTool);
+        
         console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(improvePrompt, planModel || undefined);
+        await planTool.execute(improvePrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -347,13 +356,16 @@ async function resumePlanGeneration(
  */
 async function resumeExecution(
   state: ExecutionState,
-  aiTool: AICliTool,
+  defaultCliTool: CliToolType | null,
   maxFollowUpIterations: number,
   execIterations: number,
   isDestinyMode: boolean,
   executeModel: string | null,
   auditModel: string | null,
-  planModel: string | null
+  planModel: string | null,
+  planCliTool: CliToolType | null,
+  executeCliTool: CliToolType | null,
+  auditCliTool: CliToolType | null
 ): Promise<void> {
   const { timestampDirectory } = state;
   const outputDirectory = resolve(timestampDirectory, 'plan');
@@ -418,10 +430,11 @@ async function resumeExecution(
         requirementsPath,
         currentExecuteOutputDirectory,
         maxFollowUpIterations,
-        aiTool,
+        defaultCliTool,
         execIterationCount,
         isDestinyMode,
-        executeModel
+        executeModel,
+        executeCliTool
       );
       
       // Mark that we've completed this iteration
@@ -497,7 +510,10 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapAuditPrompt, auditModel || undefined);
+      // Get the appropriate CLI tool for audit
+      const auditTool = await getCliToolForAction('audit', auditCliTool, defaultCliTool);
+      
+      await auditTool.execute(gapAuditPrompt, auditModel || undefined);
       console.log('\n✅ Gap audit complete!');
       
       // Read gap audit metadata
@@ -573,7 +589,10 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapPlanPrompt, planModel || undefined);
+      // Get the appropriate CLI tool for plan operations
+      const planTool = await getCliToolForAction('plan', planCliTool, defaultCliTool);
+      
+      await planTool.execute(gapPlanPrompt, planModel || undefined);
       console.log('\n✅ Gap closure plan complete!');
       
       currentPlanPath = gapPlanPath;
@@ -640,10 +659,11 @@ async function resumeExecution(
         requirementsPath,
         executeOutputDirectory,
         maxFollowUpIterations,
-        aiTool,
+        defaultCliTool,
         execIterationCount,
         isDestinyMode,
-        executeModel
+        executeModel,
+        executeCliTool
       );
       
       // Sync state with artifacts after execution
@@ -701,7 +721,10 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapAuditPrompt, auditModel || undefined);
+      // Get the appropriate CLI tool for audit
+      const auditTool = await getCliToolForAction('audit', auditCliTool, defaultCliTool);
+      
+      await auditTool.execute(gapAuditPrompt, auditModel || undefined);
       console.log('\n✅ Gap audit complete!');
       
       // Read gap audit metadata
@@ -775,7 +798,10 @@ async function resumeExecution(
         executionIteration: execIterationCount.toString(),
       });
       
-      await aiTool.execute(gapPlanPrompt, planModel || undefined);
+      // Get the appropriate CLI tool for plan operations
+      const planTool = await getCliToolForAction('plan', planCliTool, defaultCliTool);
+      
+      await planTool.execute(gapPlanPrompt, planModel || undefined);
       console.log('\n✅ Gap closure plan complete!');
       
       currentPlanPath = gapPlanPath;

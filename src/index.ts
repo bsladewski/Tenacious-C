@@ -30,7 +30,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--plan-model <model>] [--execute-model <model>] [--audit-model <model>] [--preview-plan] [--resume] [--the-prompt-of-destiny]');
+    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--plan-cli-tool <codex|copilot|cursor|claude>] [--execute-cli-tool <codex|copilot|cursor|claude>] [--audit-cli-tool <codex|copilot|cursor|claude>] [--plan-model <model>] [--execute-model <model>] [--audit-model <model>] [--preview-plan] [--resume] [--the-prompt-of-destiny]');
     console.error('');
     console.error('Examples:');
     console.error('  tenacious-c "Add user authentication"');
@@ -43,6 +43,7 @@ async function main() {
     console.error('  tenacious-c "Add user authentication" --cli-tool cursor');
     console.error('  tenacious-c "Add user authentication" --cli-tool claude');
     console.error('  tenacious-c "Add user authentication" --plan-model sonnet-4.5 --execute-model opus-4.5-thinking --audit-model gpt-5.2-codex');
+    console.error('  tenacious-c "Add user authentication" --plan-cli-tool codex --execute-cli-tool claude --audit-cli-tool codex');
     console.error('  tenacious-c "Add user authentication" --preview-plan');
     console.error('  tenacious-c --resume');
     console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
@@ -52,7 +53,10 @@ async function main() {
     console.error('  --plan-confidence <number>          Minimum confidence threshold (0-100) (default: 85)');
     console.error('  --max-follow-up-iterations <number>  Maximum number of follow-up execution iterations (default: 10)');
     console.error('  --exec-iterations <number>          Maximum number of plan-based execution iterations (default: 5)');
-    console.error('  --cli-tool <codex|copilot|cursor|claude>  CLI tool to use (default: auto-detect or prompt)');
+    console.error('  --cli-tool <codex|copilot|cursor|claude>  CLI tool to use (default: auto-detect or prompt, saved as preference)');
+    console.error('  --plan-cli-tool <codex|copilot|cursor|claude>  CLI tool to use for plan generation/revisions (overrides --cli-tool, not saved)');
+    console.error('  --execute-cli-tool <codex|copilot|cursor|claude>  CLI tool to use for execution/follow-ups (overrides --cli-tool, not saved)');
+    console.error('  --audit-cli-tool <codex|copilot|cursor|claude>  CLI tool to use for gap audits (overrides --cli-tool, not saved)');
     console.error('  --plan-model <model>               Model to use for plan generation and revisions (optional)');
     console.error('  --execute-model <model>            Model to use for plan execution and follow-ups (optional)');
     console.error('  --audit-model <model>               Model to use for gap audits (optional)');
@@ -73,6 +77,9 @@ async function main() {
   let planModel: string | null = null; // Default value
   let executeModel: string | null = null; // Default value
   let auditModel: string | null = null; // Default value
+  let planCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
+  let executeCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
+  let auditCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
   let previewPlan = false; // Default value
   let resume = false; // Default value
   
@@ -255,6 +262,78 @@ async function main() {
         process.exit(1);
       }
       auditModel = value;
+    } else if (arg === '--plan-cli-tool') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --plan-cli-tool requires a value (codex, copilot, cursor, or claude)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+        process.exit(1);
+      }
+      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--plan-cli-tool=')) {
+      // Handle --plan-cli-tool=codex format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --plan-cli-tool= requires a value (codex, copilot, cursor, or claude)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+        process.exit(1);
+      }
+      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+    } else if (arg === '--execute-cli-tool') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --execute-cli-tool requires a value (codex, copilot, cursor, or claude)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+        process.exit(1);
+      }
+      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--execute-cli-tool=')) {
+      // Handle --execute-cli-tool=claude format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --execute-cli-tool= requires a value (codex, copilot, cursor, or claude)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+        process.exit(1);
+      }
+      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+    } else if (arg === '--audit-cli-tool') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --audit-cli-tool requires a value (codex, copilot, cursor, or claude)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+        process.exit(1);
+      }
+      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--audit-cli-tool=')) {
+      // Handle --audit-cli-tool=codex format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --audit-cli-tool= requires a value (codex, copilot, cursor, or claude)');
+        process.exit(1);
+      }
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
+        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+        process.exit(1);
+      }
+      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
     } else if (arg === '--preview-plan') {
       previewPlan = true;
     } else if (arg === '--resume') {
@@ -287,7 +366,7 @@ async function main() {
 
   try {
     // If resume is set, input is ignored (can be empty string)
-    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume, planModel, executeModel, auditModel);
+    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume, planModel, executeModel, auditModel, planCliTool, executeCliTool, auditCliTool);
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

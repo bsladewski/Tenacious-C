@@ -25,6 +25,8 @@ Follow instruction precedence (highest to lowest):
 
 **Important:** If any requirement or plan step is incomplete/ambiguous, do your best to proceed. Make reasonable assumptions and continue execution. The tool is designed to be iterative and will handle refinement in subsequent passes.
 
+**CRITICAL EXCEPTION:** The "make reasonable assumptions" rule does NOT apply to output file formats. Output file formats (especially JSON metadata files) must be followed exactly as specified. Do not add extra keys, markdown formatting, or any content that deviates from the exact schema.
+
 ---
 
 ## Scope Detection
@@ -125,10 +127,16 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
    - **Note:** This is execution iteration {{executionIteration}} - use this filename for full history tracking
 
 2. **Execute Metadata JSON:** \`{{outputDirectory}}/execute-metadata.json\`
-   - This file MUST conform to the exact schema provided below
+   - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the execution summary. It MUST contain ONLY these top-level keys: \`hasFollowUps\`, \`hardBlockers\`, \`summary\`. Do NOT add any other keys.
+   - **CRITICAL - VALID JSON ONLY:** The file MUST be valid JSON parseable by \`JSON.parse()\`. No markdown code fences, no comments, no extra text before or after the JSON object.
    - Set \`hasFollowUps\` to \`true\` if there are any follow-ups in the execution summary (even if just one)
    - Add any hard blockers to the \`hardBlockers\` array (should be rare)
    - **CRITICAL:** Follow-ups in the execution summary must be detailed, specific, and **actionable by the agent** - they will be executed programmatically in iterative runs
+   - **CRITICAL - VALIDATION REQUIRED:** After writing \`execute-metadata.json\`, you MUST run this validation command:
+     \`\`\`bash
+     node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/execute-metadata.json','utf8')); console.log('execute-metadata.json parses')"
+     \`\`\`
+     If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
 
 **Execution Summary Structure** (for \`execution-summary.md\`):
 
@@ -182,6 +190,22 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 
 - If there are no follow-ups, use "- None" or leave the section empty
 
+**Execute Metadata JSON Requirements:**
+
+**CRITICAL - ALLOWED KEYS ONLY:**
+- \`execute-metadata.json\` is NOT a JSON version of the execution summary.
+- It MUST contain ONLY these top-level keys: \`hasFollowUps\`, \`hardBlockers\`, \`summary\`.
+- It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
+
+**Example execute-metadata.json:**
+\`\`\`json
+{
+  "hasFollowUps": false,
+  "hardBlockers": [],
+  "summary": "Plain text 1–2 paragraph summary."
+}
+\`\`\`
+
 **Execute Metadata JSON Schema:**
 
 \`\`\`json
@@ -195,7 +219,15 @@ ${metadataSchema}
 - The \`summary\` field must contain a brief terminal-friendly summary (1-2 paragraphs worth of text) of what was accomplished
   - Use plain text (no markdown formatting)
   - Suitable for terminal display
-  - Summarize the key work completed: what was implemented, files created/modified, features added, and any notable achievements`,
+  - Summarize the key work completed: what was implemented, files created/modified, features added, and any notable achievements
+  - Keep it concise (max 3000 characters) - do NOT dump the full execution summary here
+
+**CRITICAL - JSON VALIDATION:**
+After writing \`execute-metadata.json\`, you MUST run this validation command:
+\`\`\`bash
+node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/execute-metadata.json','utf8')); console.log('execute-metadata.json parses')"
+\`\`\`
+If parsing fails, you MUST fix the file and re-run the validation until it succeeds.`,
     description: 'Template for executing codebase changes based on a plan',
     requiredVariables: ['planPath', 'requirementsPath', 'outputDirectory', 'executionIteration'],
   };

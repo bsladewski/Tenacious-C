@@ -75,6 +75,22 @@ You MUST NOT modify any files besides the plan markdown and metadata JSON in \`{
 
 The metadata file at \`{{outputDirectory}}/plan-metadata.json\` MUST conform to this schema:
 
+**CRITICAL - ALLOWED KEYS ONLY:**
+- \`plan-metadata.json\` is NOT a JSON version of the plan.
+- It MUST contain ONLY these top-level keys: \`confidence\`, \`openQuestions\`, \`summary\`.
+- It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
+
+**Example plan-metadata.json:**
+\`\`\`json
+{
+  "confidence": 80,
+  "openQuestions": [],
+  "summary": "Plain text 1–2 paragraph summary."
+}
+\`\`\`
+
+**Plan Metadata JSON Schema:**
+
 \`\`\`json
 ${metadataSchema}
 \`\`\`
@@ -84,6 +100,14 @@ ${metadataSchema}
 - If new questions arise during deeper analysis, add them to \`openQuestions\` with **at least 2 suggested answers** in the \`suggestedAnswers\` array (this is required for the interactive prompt system)
 - Suggested answers should be concise, distinct options that cover the main possibilities
 - The confidence should reflect the actual completeness and depth of the plan after your improvements
+- Keep the \`summary\` concise (max 3000 characters) - do NOT dump the full plan here
+
+**CRITICAL - JSON VALIDATION:**
+After writing \`plan-metadata.json\`, you MUST run this validation command:
+\`\`\`bash
+node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/plan-metadata.json','utf8')); console.log('plan-metadata.json parses')"
+\`\`\`
+If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
 
 ---
 

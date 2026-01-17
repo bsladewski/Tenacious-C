@@ -98,3 +98,52 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
     return new ClaudeCliTool();
   }
 }
+
+/**
+ * Get a CLI tool instance without saving preferences (for action-specific overrides)
+ * @param specifiedTool - Tool type to use, or null to use default detection
+ * @returns An AICliTool instance
+ */
+async function getCliToolWithoutSaving(specifiedTool: CliToolType | null): Promise<AICliTool> {
+  // If tool is explicitly specified, use it but don't save preference
+  if (specifiedTool) {
+    if (specifiedTool === 'codex') {
+      return new CodexCliTool();
+    } else if (specifiedTool === 'copilot') {
+      return new CopilotCliTool();
+    } else if (specifiedTool === 'cursor') {
+      return new CursorCliTool();
+    } else {
+      return new ClaudeCliTool();
+    }
+  }
+  
+  // No tool specified - use the default getCliTool which handles preferences
+  return await getCliTool(null);
+}
+
+/**
+ * Action types for CLI tool selection
+ */
+export type ActionType = 'plan' | 'execute' | 'audit';
+
+/**
+ * Get the appropriate CLI tool for a specific action type
+ * @param actionType - The type of action (plan, execute, or audit)
+ * @param actionSpecificTool - Tool specified for this specific action, or null
+ * @param defaultTool - Default tool to use if action-specific tool is not specified, or null
+ * @returns An AICliTool instance
+ */
+export async function getCliToolForAction(
+  actionType: ActionType,
+  actionSpecificTool: CliToolType | null,
+  defaultTool: CliToolType | null
+): Promise<AICliTool> {
+  // If there's an action-specific tool, use it (without saving preferences)
+  if (actionSpecificTool) {
+    return await getCliToolWithoutSaving(actionSpecificTool);
+  }
+  
+  // Otherwise, use the default tool (which may save preferences if it's the main --cli-tool)
+  return await getCliTool(defaultTool);
+}

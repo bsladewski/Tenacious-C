@@ -120,7 +120,7 @@ tenacious-c "Add user authentication" --exec-iterations 3
 
 #### `--cli-tool <codex|copilot|cursor|claude>`
 
-Explicitly specify which CLI tool to use. If not specified, the tool will:
+Explicitly specify which CLI tool to use for all operations. If not specified, the tool will:
 1. Check for a saved preference in `.tenacious-c/cli-tool-preference.json`
 2. Auto-detect available tools
 3. If only one is available, use it automatically
@@ -131,6 +131,70 @@ Explicitly specify which CLI tool to use. If not specified, the tool will:
 tenacious-c "Add user authentication" --cli-tool copilot
 tenacious-c "Add user authentication" --cli-tool cursor
 tenacious-c "Add user authentication" --cli-tool claude
+```
+
+**Note:** This preference is saved for future runs. To use different tools for different phases, use the phase-specific flags below.
+
+#### `--plan-cli-tool <codex|copilot|cursor|claude>`
+
+Specify which CLI tool to use for plan generation and revisions. This overrides `--cli-tool` for planning operations only. This preference is **not saved** (unlike `--cli-tool`).
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --plan-cli-tool codex
+```
+
+#### `--execute-cli-tool <codex|copilot|cursor|claude>`
+
+Specify which CLI tool to use for plan execution and follow-up iterations. This overrides `--cli-tool` for execution operations only. This preference is **not saved** (unlike `--cli-tool`).
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --execute-cli-tool claude
+```
+
+#### `--audit-cli-tool <codex|copilot|cursor|claude>`
+
+Specify which CLI tool to use for gap audits. This overrides `--cli-tool` for audit operations only. This preference is **not saved** (unlike `--cli-tool`).
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --audit-cli-tool codex
+```
+
+#### `--plan-model <model>`
+
+Specify which model to use for plan generation and revisions. This is optional and depends on the CLI tool's model support.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --plan-model sonnet-4.5
+```
+
+#### `--execute-model <model>`
+
+Specify which model to use for plan execution and follow-up iterations. This is optional and depends on the CLI tool's model support.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --execute-model opus-4.5-thinking
+```
+
+#### `--audit-model <model>`
+
+Specify which model to use for gap audits. This is optional and depends on the CLI tool's model support.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --audit-model gpt-5.2-codex
+```
+
+**Combined Example:**
+```bash
+tenacious-c "Add user authentication" \
+  --plan-cli-tool codex --plan-model sonnet-4.5 \
+  --execute-cli-tool claude --execute-model opus-4.5-thinking \
+  --audit-cli-tool codex --audit-model gpt-5.2-codex
 ```
 
 #### `--preview-plan`
@@ -264,6 +328,41 @@ tenacious-c "Add feature" --cli-tool claude
 ```
 
 This will also save your preference for future runs.
+
+### Phase-Specific Tool Selection
+
+You can use different CLI tools for different phases of the workflow:
+
+- `--plan-cli-tool` - Use a specific tool for plan generation and revisions
+- `--execute-cli-tool` - Use a specific tool for plan execution and follow-ups
+- `--audit-cli-tool` - Use a specific tool for gap audits
+
+These phase-specific flags override `--cli-tool` for their respective phases and are **not saved** as preferences. This allows you to use different tools for different operations without changing your default preference.
+
+**Example:**
+```bash
+# Use Codex for planning, Claude for execution, Codex for audits
+tenacious-c "Add feature" \
+  --plan-cli-tool codex \
+  --execute-cli-tool claude \
+  --audit-cli-tool codex
+```
+
+### Model Selection
+
+Some CLI tools support specifying which model to use. You can specify models for each phase:
+
+- `--plan-model` - Model for plan generation and revisions
+- `--execute-model` - Model for plan execution and follow-ups
+- `--audit-model` - Model for gap audits
+
+**Example:**
+```bash
+tenacious-c "Add feature" \
+  --plan-model sonnet-4.5 \
+  --execute-model opus-4.5-thinking \
+  --audit-model gpt-5.2-codex
+```
 
 ### Tool Behavior
 

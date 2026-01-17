@@ -17,6 +17,9 @@ export function createExecutionState(
     planModel: string | null;
     executeModel: string | null;
     auditModel: string | null;
+    planCliTool: CliToolType | null;
+    executeCliTool: CliToolType | null;
+    auditCliTool: CliToolType | null;
   },
   phase: ExecutionState['phase'] = 'plan-generation'
 ): ExecutionState {

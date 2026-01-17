@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve, isAbsolute } from 'path';
-import { AICliTool } from '../interfaces/ai-cli-tool';
-import { getCliTool } from '../utils/get-cli-tool';
+import { getCliTool, getCliToolForAction } from '../utils/get-cli-tool';
 import { CliToolType } from '../utils/cli-tool-preference';
 import { getPlaceholderTemplate } from '../templates/plan.template';
 import { getAnswerQuestionsTemplate } from '../templates/answer-questions.template';
@@ -46,20 +45,22 @@ function formatIteration(current: number, max: number, isDestinyMode: boolean): 
  * @param requirementsPath - Path to the requirements file
  * @param executeOutputDirectory - Directory for execution output
  * @param maxFollowUpIterations - Maximum number of follow-up iterations
- * @param aiTool - AI CLI tool instance
+ * @param defaultCliTool - Default CLI tool type (from --cli-tool or saved preference)
  * @param executionIteration - Current execution iteration number (for display)
  * @param isDestinyMode - Whether prompt of destiny mode is active
  * @param executeModel - Optional model name to use for execution and follow-ups
+ * @param executeCliTool - Optional CLI tool to use for execution (overrides defaultCliTool)
  */
 export async function executePlanWithFollowUps(
   planPath: string,
   requirementsPath: string,
   executeOutputDirectory: string,
   maxFollowUpIterations: number,
-  aiTool: AICliTool,
+  defaultCliTool: CliToolType | null,
   executionIteration: number,
   isDestinyMode: boolean,
-  executeModel?: string | null
+  executeModel?: string | null,
+  executeCliTool?: CliToolType | null
 ): Promise<void> {
   // Ensure execution output directory exists
   mkdirSync(executeOutputDirectory, { recursive: true });
@@ -78,8 +79,11 @@ export async function executePlanWithFollowUps(
       executionIteration: executionIteration.toString(),
     });
 
+    // Get the appropriate CLI tool for execution
+    const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+
     // Execute using AI CLI tool with execute model if specified
-    await aiTool.execute(executePrompt, executeModel || undefined);
+    await executeTool.execute(executePrompt, executeModel || undefined);
 
     console.log('\n✅ Plan execution complete!');
     
@@ -152,8 +156,11 @@ export async function executePlanWithFollowUps(
             followUpIteration: followUpIteration.toString(),
           });
 
+          // Get the appropriate CLI tool for execution
+          const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+          
           // Execute using AI CLI tool with execute model if specified
-          await aiTool.execute(followUpsPrompt, executeModel || undefined);
+          await executeTool.execute(followUpsPrompt, executeModel || undefined);
         } else {
           // Hard blockers were already resolved (iteration 0 exists)
           console.log('\n✅ Hard blockers were already resolved. Continuing with follow-ups...');
@@ -222,8 +229,11 @@ export async function executePlanWithFollowUps(
           followUpIteration: currentFollowUpIteration.toString(),
         });
 
+      // Get the appropriate CLI tool for execution
+      const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+      
       // Execute using AI CLI tool with execute model if specified
-      await aiTool.execute(followUpsPrompt, executeModel || undefined);
+      await executeTool.execute(followUpsPrompt, executeModel || undefined);
 
         followUpIterationCount++;
 
@@ -270,8 +280,11 @@ export async function executePlanWithFollowUps(
         followUpIteration: currentFollowUpIteration.toString(),
       });
 
+      // Get the appropriate CLI tool for execution
+      const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+      
       // Execute using AI CLI tool with execute model if specified
-      await aiTool.execute(followUpsPrompt, executeModel || undefined);
+      await executeTool.execute(followUpsPrompt, executeModel || undefined);
 
       followUpIterationCount++;
 
@@ -330,8 +343,11 @@ export async function executePlanWithFollowUps(
  * @param planModel - Optional model name to use for plan generation and revisions
  * @param executeModel - Optional model name to use for plan execution and follow-ups
  * @param auditModel - Optional model name to use for gap audits
+ * @param planCliTool - Optional CLI tool to use for plan generation/revisions (overrides specifiedCliTool)
+ * @param executeCliTool - Optional CLI tool to use for execution/follow-ups (overrides specifiedCliTool)
+ * @param auditCliTool - Optional CLI tool to use for gap audits (overrides specifiedCliTool)
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null): Promise<void> {
   // If resume flag is set, find and resume the latest run
   if (resumeFlag) {
     const tenaciousCDir = resolve(process.cwd(), '.tenacious-c');
@@ -364,6 +380,9 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       planModel: planModel ?? state.config.planModel, // Use new model if specified, otherwise keep saved
       executeModel: executeModel ?? state.config.executeModel, // Use new model if specified, otherwise keep saved
       auditModel: auditModel ?? state.config.auditModel, // Use new model if specified, otherwise keep saved
+      planCliTool: planCliTool ?? state.config.planCliTool, // Use new CLI tool if specified, otherwise keep saved
+      executeCliTool: executeCliTool ?? state.config.executeCliTool, // Use new CLI tool if specified, otherwise keep saved
+      auditCliTool: auditCliTool ?? state.config.auditCliTool, // Use new CLI tool if specified, otherwise keep saved
     };
     
     // Update state with overridden config
@@ -414,6 +433,9 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       planModel,
       executeModel,
       auditModel,
+      planCliTool,
+      executeCliTool,
+      auditCliTool,
     },
     'plan-generation'
   );
@@ -426,14 +448,14 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     requirements,
   });
 
-  // Get the appropriate CLI tool (reuse for all operations in this run)
-  const aiTool = await getCliTool(specifiedCliTool);
+  // Get the appropriate CLI tool for plan generation
+  const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
   
   // Generate initial plan
   console.log('\n📋 Generating initial plan...');
   
   // Execute using AI CLI tool with plan model if specified
-  await aiTool.execute(prompt, planModel || undefined);
+  await planTool.execute(prompt, planModel || undefined);
 
   // Update state after initial plan generation
   executionState = {
@@ -517,8 +539,11 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
           qaHistory: qaHistory || '',
         });
         
+        // Get the appropriate CLI tool for plan operations
+        const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+        
         console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(answerPrompt, planModel || undefined);
+        await planTool.execute(answerPrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -546,8 +571,11 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
           outputDirectory,
         });
         
+        // Get the appropriate CLI tool for plan operations
+        const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+        
         console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await aiTool.execute(improvePrompt, planModel || undefined);
+        await planTool.execute(improvePrompt, planModel || undefined);
         
         revisionCount++;
         
@@ -650,10 +678,11 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       requirementsPath,
       executeOutputDirectory,
       maxFollowUpIterations,
-      aiTool,
+      specifiedCliTool,
       execIterationCount,
       isDestinyMode,
-      executeModel
+      executeModel,
+      executeCliTool
     );
     
     // Sync state with artifacts after execution
@@ -686,8 +715,11 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       executionIteration: execIterationCount.toString(),
     });
     
+    // Get the appropriate CLI tool for audit
+    const auditTool = await getCliToolForAction('audit', auditCliTool, specifiedCliTool);
+    
     // Execute using AI CLI tool with audit model if specified
-    await aiTool.execute(gapAuditPrompt, auditModel || undefined);
+    await auditTool.execute(gapAuditPrompt, auditModel || undefined);
     
     console.log('\n✅ Gap audit complete!');
     
@@ -747,8 +779,11 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         executionIteration: execIterationCount.toString(),
       });
       
+      // Get the appropriate CLI tool for plan operations
+      const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+      
       // Execute using AI CLI tool with plan model if specified
-      await aiTool.execute(gapPlanPrompt, planModel || undefined);
+      await planTool.execute(gapPlanPrompt, planModel || undefined);
       
       console.log('\n✅ Gap closure plan complete!');
       
@@ -793,7 +828,10 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
           executionIteration: execIterationCount.toString(),
         });
         
-        await aiTool.execute(gapPlanPrompt, planModel || undefined);
+        // Get the appropriate CLI tool for plan operations
+        const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+        
+        await planTool.execute(gapPlanPrompt, planModel || undefined);
         console.log('\n✅ Gap closure plan complete!');
         
         currentPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);
@@ -815,9 +853,11 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   saveExecutionState(timestampDirectory, executionState);
 
   // Generate and display final summary
+  // Use default tool for summary generation
   console.log('\n📊 Generating execution summary...\n');
   try {
-    const summary = await generateFinalSummary(timestampDirectory, aiTool);
+    const defaultTool = await getCliTool(specifiedCliTool);
+    const summary = await generateFinalSummary(timestampDirectory, defaultTool);
     console.log(summary);
   } catch (error) {
     console.warn(`\n⚠️  Could not generate final summary: ${error instanceof Error ? error.message : String(error)}`);

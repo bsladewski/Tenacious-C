@@ -22,6 +22,7 @@ export interface GapAuditMetadata {
 export const gapAuditMetadataJsonSchema = {
   type: 'object',
   required: ['gapsIdentified', 'summary'],
+  additionalProperties: false,
   properties: {
     gapsIdentified: {
       type: 'boolean',
@@ -29,6 +30,8 @@ export const gapAuditMetadataJsonSchema = {
     },
     summary: {
       type: 'string',
+      minLength: 1,
+      maxLength: 3000,
       description: 'Brief terminal-friendly summary of the gap audit results (1-2 paragraphs worth of text). Plain text, suitable for terminal display, summarizing what was audited and what gaps were found (if any).',
     },
   },

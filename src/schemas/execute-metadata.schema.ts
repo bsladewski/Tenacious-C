@@ -42,6 +42,7 @@ export interface HardBlocker {
 export const executeMetadataJsonSchema = {
   type: 'object',
   required: ['hasFollowUps', 'hardBlockers', 'summary'],
+  additionalProperties: false,
   properties: {
     hasFollowUps: {
       type: 'boolean',
@@ -49,16 +50,20 @@ export const executeMetadataJsonSchema = {
     },
     hardBlockers: {
       type: 'array',
+      default: [],
       items: {
         type: 'object',
         required: ['description', 'reason'],
+        additionalProperties: false,
         properties: {
           description: {
             type: 'string',
+            minLength: 1,
             description: 'Description of the hard blocker',
           },
           reason: {
             type: 'string',
+            minLength: 1,
             description: 'Why this prevents execution from continuing',
           },
         },
@@ -67,6 +72,8 @@ export const executeMetadataJsonSchema = {
     },
     summary: {
       type: 'string',
+      minLength: 1,
+      maxLength: 3000,
       description: 'Brief terminal-friendly summary of what was accomplished in this execution (1-2 paragraphs worth of text). Plain text, suitable for terminal display, summarizing the key work completed.',
     },
   },
