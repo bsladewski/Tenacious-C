@@ -17,7 +17,34 @@ export class ClaudeCliTool implements AICliTool {
   }
 
   async execute(prompt: string, model?: string): Promise<void> {
-    const spinner = ora('Running Claude...').start();
+    const maxRetries = 2;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await this.executeOnce(prompt, model, attempt);
+        return; // Success, exit retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // If this was the last attempt, throw the error
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+
+        // Wait 10 seconds before retrying
+        const spinner = ora(`Claude execution failed, retrying in 10 seconds... (attempt ${attempt + 1}/${maxRetries})`).start();
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        spinner.stop();
+      }
+    }
+
+    // This should never be reached, but TypeScript needs it
+    throw lastError || new Error('Claude execution failed after retries');
+  }
+
+  private async executeOnce(prompt: string, model: string | undefined, attempt: number): Promise<void> {
+    const spinner = ora(attempt > 0 ? `Running Claude... (retry ${attempt + 1})` : 'Running Claude...').start();
 
     return new Promise((resolve, reject) => {
       // Use claude with -p/--print for non-interactive mode
