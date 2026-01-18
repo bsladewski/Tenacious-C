@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { AICliTool } from '../interfaces/ai-cli-tool';
+import { ExecutionContext } from '../interfaces/execution-context';
 import { getGenerateSummaryTemplate } from '../templates/generate-summary.template';
 import { interpolateTemplate } from '../templates/prompt-template';
 
@@ -42,7 +43,12 @@ The summary must be:
 Write ONLY the summary content to the file - no additional commentary or explanations.`;
 
   // Execute using AI CLI tool
-  await aiTool.execute(promptWithOutput);
+  // Pass the timestamp directory in the context so mock tool can use it
+  const summaryContext: ExecutionContext = {
+    phase: 'generate-summary',
+    outputDirectory: timestampDirectory,
+  };
+  await aiTool.execute(promptWithOutput, undefined, summaryContext);
 
   // Wait a moment for file to be written, then read it
   // Try reading with a small delay and retries

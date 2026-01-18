@@ -3,6 +3,7 @@ import { CodexCliTool } from '../tools/codex-cli-tool';
 import { CopilotCliTool } from '../tools/copilot-cli-tool';
 import { CursorCliTool } from '../tools/cursor-cli-tool';
 import { ClaudeCliTool } from '../tools/claude-cli-tool';
+import { MockCliTool } from '../tools/mock-cli-tool';
 import { CliToolType } from './cli-tool-preference';
 import { loadCliToolPreference, saveCliToolPreference } from './cli-tool-preference';
 import { detectAvailableTools } from './detect-cli-tools';
@@ -14,10 +15,12 @@ import { promptForCliTool } from './prompt-cli-tool';
  * @returns An AICliTool instance
  */
 export async function getCliTool(specifiedTool: CliToolType | null): Promise<AICliTool> {
-  // If tool is explicitly specified, use it and save preference
+  // If tool is explicitly specified, use it and save preference (except mock)
   if (specifiedTool) {
-    // Save the explicitly specified tool as preference for future runs
-    saveCliToolPreference(specifiedTool);
+    // Save the explicitly specified tool as preference for future runs (but not mock)
+    if (specifiedTool !== 'mock') {
+      saveCliToolPreference(specifiedTool);
+    }
     
     if (specifiedTool === 'codex') {
       return new CodexCliTool();
@@ -25,15 +28,17 @@ export async function getCliTool(specifiedTool: CliToolType | null): Promise<AIC
       return new CopilotCliTool();
     } else if (specifiedTool === 'cursor') {
       return new CursorCliTool();
-    } else {
+    } else if (specifiedTool === 'claude') {
       return new ClaudeCliTool();
+    } else if (specifiedTool === 'mock') {
+      return new MockCliTool();
     }
   }
   
   // Check for saved preference
   const savedPreference = loadCliToolPreference();
   if (savedPreference) {
-    // Verify the saved tool is still available
+    // Verify the saved tool is still available (mock is never saved)
     const available = detectAvailableTools();
     if ((savedPreference === 'codex' && available.codex) || 
         (savedPreference === 'copilot' && available.copilot) ||
@@ -113,8 +118,10 @@ async function getCliToolWithoutSaving(specifiedTool: CliToolType | null): Promi
       return new CopilotCliTool();
     } else if (specifiedTool === 'cursor') {
       return new CursorCliTool();
-    } else {
+    } else if (specifiedTool === 'claude') {
       return new ClaudeCliTool();
+    } else if (specifiedTool === 'mock') {
+      return new MockCliTool();
     }
   }
   

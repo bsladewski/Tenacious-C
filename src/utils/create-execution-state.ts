@@ -20,6 +20,7 @@ export function createExecutionState(
     planCliTool: CliToolType | null;
     executeCliTool: CliToolType | null;
     auditCliTool: CliToolType | null;
+    fallbackCliTools: CliToolType[];
   },
   phase: ExecutionState['phase'] = 'plan-generation'
 ): ExecutionState {

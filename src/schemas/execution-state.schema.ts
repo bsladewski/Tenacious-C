@@ -71,6 +71,7 @@ export interface ExecutionState {
     planCliTool: CliToolType | null;
     executeCliTool: CliToolType | null;
     auditCliTool: CliToolType | null;
+    fallbackCliTools: CliToolType[];
   };
   
   /**
@@ -79,4 +80,4 @@ export interface ExecutionState {
   lastSaved: string;
 }
 
-export type CliToolType = 'codex' | 'copilot' | 'cursor' | 'claude';
+export type CliToolType = 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';

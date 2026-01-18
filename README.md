@@ -197,6 +197,34 @@ tenacious-c "Add user authentication" \
   --audit-cli-tool codex --audit-model gpt-5.2-codex
 ```
 
+#### `--fallback-cli-tools <tool1,tool2,...>`
+
+Specify a comma-separated list of fallback CLI tools to try if the primary tool fails after exhausting its retry attempts. This provides resilience against rate limiting and connectivity issues.
+
+When a CLI tool fails after retries, Tenacious C will:
+1. Try the next tool in the fallback list
+2. Clear the model configuration for that phase (since the fallback tool may not support the same models)
+3. Continue execution with the fallback tool
+
+**Important:** Fallback is phase-specific. If the execute tool fails, only the execute phase switches to the fallback tool - other phases continue using their configured tools.
+
+**Default:** No fallback tools (empty list)
+
+**Example:**
+```bash
+# Simple fallback from claude to codex to cursor
+tenacious-c "Add user authentication" --cli-tool claude --fallback-cli-tools codex,cursor
+
+# Complex configuration with phase-specific tools and fallback
+tenacious-c "Add user authentication" \
+  --plan-cli-tool copilot --plan-model gpt-5.2 \
+  --execute-cli-tool claude --execute-model opus-4.5 \
+  --audit-cli-tool codex \
+  --fallback-cli-tools codex,cursor
+# If Claude fails during execution, switches to codex (model cleared)
+# Copilot continues for planning, Codex continues for audits
+```
+
 #### `--preview-plan`
 
 Preview the initial plan markdown file before proceeding to execution. The tool will display the plan using the best available viewer (glow if available, otherwise less, or cat as fallback). Press 'q' to exit the viewer and continue.
@@ -363,6 +391,31 @@ tenacious-c "Add feature" \
   --execute-model opus-4.5-thinking \
   --audit-model gpt-5.2-codex
 ```
+
+### Fallback and Retry Behavior
+
+Tenacious C includes built-in resilience for handling CLI tool failures:
+
+**Retry Logic:** Each CLI tool automatically retries twice (3 total attempts) with a 10-second delay between retries. This handles transient issues like rate limiting and connectivity problems.
+
+**Fallback Support:** If retries are exhausted and a fallback list is configured with `--fallback-cli-tools`, the tool will:
+1. Switch to the next available fallback tool for that phase
+2. Clear any model configuration for that phase (fallback tools may not support the same models)
+3. Continue execution
+
+Fallback is phase-specific - if execution fails, only the execution phase switches to fallback while planning and auditing continue using their original tools.
+
+**Example:**
+```bash
+# Primary: claude with opus-4.5 for execution
+# Fallback: codex, then cursor
+tenacious-c "Add feature" \
+  --cli-tool claude \
+  --execute-model opus-4.5 \
+  --fallback-cli-tools codex,cursor
+```
+
+If Claude fails and exhausts retries, execution switches to Codex (without the opus-4.5 model). If Codex also fails, it switches to Cursor.
 
 ### Tool Behavior
 

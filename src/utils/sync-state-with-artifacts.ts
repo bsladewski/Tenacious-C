@@ -21,8 +21,10 @@ export function syncStateWithArtifacts(
   const artifacts = getExecutionArtifacts(executeOutputDirectory, executionIteration);
   
   // Determine artifact-based values
+  // followUpIterationCount represents the NEXT iteration to execute, so we add 1 to the last completed iteration
+  // This matches how the state is initialized in plan.ts and resume-plan.ts
   const artifactFollowUpIteration = artifacts.lastFollowUpIteration !== null 
-    ? artifacts.lastFollowUpIteration 
+    ? artifacts.lastFollowUpIteration + 1 
     : 0;
   const artifactHasDoneIteration0 = artifacts.hasDoneIteration0;
   
@@ -31,10 +33,17 @@ export function syncStateWithArtifacts(
   const stateHasDoneIteration0 = state.execution.hasDoneIteration0 || false;
   
   // Check for mismatches and log warnings
+  // Only warn on genuine mismatches, not when state has default values (0/false) and artifacts have values
+  // This is expected right after execution completes for the first time
   const hasMismatch = artifactFollowUpIteration !== stateFollowUpIteration || 
                       artifactHasDoneIteration0 !== stateHasDoneIteration0;
   
-  if (hasMismatch) {
+  // Only warn if state has non-default values that don't match artifacts
+  // Don't warn if state has default values (0/false) - that's expected after first execution
+  const stateHasNonDefaultValues = stateFollowUpIteration > 0 || stateHasDoneIteration0 === true;
+  const isGenuineMismatch = hasMismatch && stateHasNonDefaultValues;
+  
+  if (isGenuineMismatch) {
     if (artifactFollowUpIteration !== stateFollowUpIteration) {
       console.log(`\n⚠️  State/artifact mismatch: followUpIterationCount is ${stateFollowUpIteration} in state but ${artifactFollowUpIteration} in artifacts. Using artifact value.`);
     }

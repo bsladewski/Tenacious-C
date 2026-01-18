@@ -26,6 +26,8 @@ import { createExecutionState } from '../utils/create-execution-state';
 import { resumePlan } from './resume-plan';
 import { getExecutionArtifacts } from '../utils/scan-execution-artifacts';
 import { syncStateWithArtifacts } from '../utils/sync-state-with-artifacts';
+import { executeWithFallback, createMutableToolConfig, updatePhaseAfterFallback, MutableToolConfig } from '../utils/execute-with-fallback';
+import { ExecutionContext } from '../interfaces/execution-context';
 import inquirer from 'inquirer';
 
 /**
@@ -60,8 +62,13 @@ export async function executePlanWithFollowUps(
   executionIteration: number,
   isDestinyMode: boolean,
   executeModel?: string | null,
-  executeCliTool?: CliToolType | null
-): Promise<void> {
+  executeCliTool?: CliToolType | null,
+  fallbackCliTools?: CliToolType[]
+): Promise<{ executeCliTool: CliToolType | null; executeModel: string | null; fallbackCliTools: CliToolType[] }> {
+  // Track mutable state for fallback
+  let currentExecuteCliTool = executeCliTool || null;
+  let currentExecuteModel = executeModel || null;
+  let currentFallbackTools = fallbackCliTools ? [...fallbackCliTools] : [];
   // Ensure execution output directory exists
   mkdirSync(executeOutputDirectory, { recursive: true });
 
@@ -80,10 +87,30 @@ export async function executePlanWithFollowUps(
     });
 
     // Get the appropriate CLI tool for execution
-    const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+    const executeTool = await getCliToolForAction('execute', currentExecuteCliTool, defaultCliTool);
+    const executeToolType = currentExecuteCliTool || defaultCliTool;
 
-    // Execute using AI CLI tool with execute model if specified
-    await executeTool.execute(executePrompt, executeModel || undefined);
+    // Execute using AI CLI tool with execute model if specified, with fallback support
+    const executeContext: ExecutionContext = {
+      phase: 'execute-plan',
+      outputDirectory: executeOutputDirectory,
+      executionIteration,
+    };
+    const executeResult = await executeWithFallback(
+      executeTool,
+      executeToolType,
+      executePrompt,
+      currentExecuteModel,
+      currentFallbackTools,
+      executeContext
+    );
+    
+    // Update mutable state if fallback occurred
+    if (executeResult.fallbackOccurred) {
+      currentExecuteCliTool = executeResult.usedTool;
+      currentExecuteModel = executeResult.usedModel;
+      currentFallbackTools = executeResult.remainingFallbackTools;
+    }
 
     console.log('\n✅ Plan execution complete!');
     
@@ -157,10 +184,31 @@ export async function executePlanWithFollowUps(
           });
 
           // Get the appropriate CLI tool for execution
-          const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+          const executeTool = await getCliToolForAction('execute', currentExecuteCliTool, defaultCliTool);
+          const executeToolType = currentExecuteCliTool || defaultCliTool;
           
-          // Execute using AI CLI tool with execute model if specified
-          await executeTool.execute(followUpsPrompt, executeModel || undefined);
+          // Execute using AI CLI tool with execute model if specified, with fallback support
+          const followUpContext: ExecutionContext = {
+            phase: 'execute-follow-ups',
+            outputDirectory: executeOutputDirectory,
+            executionIteration,
+            followUpIteration,
+          };
+          const executeResult = await executeWithFallback(
+            executeTool,
+            executeToolType,
+            followUpsPrompt,
+            currentExecuteModel,
+            currentFallbackTools,
+            followUpContext
+          );
+          
+          // Update mutable state if fallback occurred
+          if (executeResult.fallbackOccurred) {
+            currentExecuteCliTool = executeResult.usedTool;
+            currentExecuteModel = executeResult.usedModel;
+            currentFallbackTools = executeResult.remainingFallbackTools;
+          }
         } else {
           // Hard blockers were already resolved (iteration 0 exists)
           console.log('\n✅ Hard blockers were already resolved. Continuing with follow-ups...');
@@ -230,10 +278,31 @@ export async function executePlanWithFollowUps(
         });
 
       // Get the appropriate CLI tool for execution
-      const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+      const executeTool = await getCliToolForAction('execute', currentExecuteCliTool, defaultCliTool);
+      const executeToolType = currentExecuteCliTool || defaultCliTool;
       
-      // Execute using AI CLI tool with execute model if specified
-      await executeTool.execute(followUpsPrompt, executeModel || undefined);
+      // Execute using AI CLI tool with execute model if specified, with fallback support
+      const followUpContext: ExecutionContext = {
+        phase: 'execute-follow-ups',
+        outputDirectory: executeOutputDirectory,
+        executionIteration,
+        followUpIteration: currentFollowUpIteration,
+      };
+      const executeResult = await executeWithFallback(
+        executeTool,
+        executeToolType,
+        followUpsPrompt,
+        currentExecuteModel,
+        currentFallbackTools,
+        followUpContext
+      );
+        
+        // Update mutable state if fallback occurred
+        if (executeResult.fallbackOccurred) {
+          currentExecuteCliTool = executeResult.usedTool;
+          currentExecuteModel = executeResult.usedModel;
+          currentFallbackTools = executeResult.remainingFallbackTools;
+        }
 
         followUpIterationCount++;
 
@@ -281,10 +350,31 @@ export async function executePlanWithFollowUps(
       });
 
       // Get the appropriate CLI tool for execution
-      const executeTool = await getCliToolForAction('execute', executeCliTool || null, defaultCliTool);
+      const executeTool = await getCliToolForAction('execute', currentExecuteCliTool, defaultCliTool);
+      const executeToolType = currentExecuteCliTool || defaultCliTool;
       
-      // Execute using AI CLI tool with execute model if specified
-      await executeTool.execute(followUpsPrompt, executeModel || undefined);
+      // Execute using AI CLI tool with execute model if specified, with fallback support
+      const followUpContext: ExecutionContext = {
+        phase: 'execute-follow-ups',
+        outputDirectory: executeOutputDirectory,
+        executionIteration,
+        followUpIteration: currentFollowUpIteration,
+      };
+      const executeResult = await executeWithFallback(
+        executeTool,
+        executeToolType,
+        followUpsPrompt,
+        currentExecuteModel,
+        currentFallbackTools,
+        followUpContext
+      );
+      
+      // Update mutable state if fallback occurred
+      if (executeResult.fallbackOccurred) {
+        currentExecuteCliTool = executeResult.usedTool;
+        currentExecuteModel = executeResult.usedModel;
+        currentFallbackTools = executeResult.remainingFallbackTools;
+      }
 
       followUpIterationCount++;
 
@@ -327,6 +417,13 @@ export async function executePlanWithFollowUps(
       console.log('\n✅ Follow-up iterations complete.');
     }
   }
+  
+  // Return updated tool config for caller to use in subsequent phases
+  return {
+    executeCliTool: currentExecuteCliTool,
+    executeModel: currentExecuteModel,
+    fallbackCliTools: currentFallbackTools,
+  };
 }
 
 /**
@@ -347,7 +444,7 @@ export async function executePlanWithFollowUps(
  * @param executeCliTool - Optional CLI tool to use for execution/follow-ups (overrides specifiedCliTool)
  * @param auditCliTool - Optional CLI tool to use for gap audits (overrides specifiedCliTool)
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null, fallbackCliTools: CliToolType[] = []): Promise<void> {
   // If resume flag is set, find and resume the latest run
   if (resumeFlag) {
     const tenaciousCDir = resolve(process.cwd(), '.tenacious-c');
@@ -383,6 +480,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       planCliTool: planCliTool ?? state.config.planCliTool, // Use new CLI tool if specified, otherwise keep saved
       executeCliTool: executeCliTool ?? state.config.executeCliTool, // Use new CLI tool if specified, otherwise keep saved
       auditCliTool: auditCliTool ?? state.config.auditCliTool, // Use new CLI tool if specified, otherwise keep saved
+      fallbackCliTools: fallbackCliTools.length > 0 ? fallbackCliTools : (state.config.fallbackCliTools || []), // Use new fallback tools if specified, otherwise keep saved
     };
     
     // Update state with overridden config
@@ -436,10 +534,20 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       planCliTool,
       executeCliTool,
       auditCliTool,
+      fallbackCliTools,
     },
     'plan-generation'
   );
   saveExecutionState(timestampDirectory, executionState);
+
+  // Mutable state for fallback tracking - these are updated when fallback occurs
+  let currentPlanCliTool = planCliTool;
+  let currentPlanModel = planModel;
+  let currentExecuteCliTool = executeCliTool;
+  let currentExecuteModel = executeModel;
+  let currentAuditCliTool = auditCliTool;
+  let currentAuditModel = auditModel;
+  let currentFallbackCliTools = [...fallbackCliTools];
 
   // Get the template and interpolate
   const template = getPlaceholderTemplate();
@@ -449,13 +557,32 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   });
 
   // Get the appropriate CLI tool for plan generation
-  const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+  const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
+  const planToolType = currentPlanCliTool || specifiedCliTool;
   
   // Generate initial plan
   console.log('\n📋 Generating initial plan...');
   
-  // Execute using AI CLI tool with plan model if specified
-  await planTool.execute(prompt, planModel || undefined);
+  // Execute using AI CLI tool with plan model if specified, with fallback support
+  const planContext: ExecutionContext = {
+    phase: 'plan-generation',
+    outputDirectory,
+  };
+  const planResult = await executeWithFallback(
+    planTool,
+    planToolType,
+    prompt,
+    currentPlanModel,
+    currentFallbackCliTools,
+    planContext
+  );
+  
+  // Update mutable state if fallback occurred
+  if (planResult.fallbackOccurred) {
+    currentPlanCliTool = planResult.usedTool;
+    currentPlanModel = planResult.usedModel;
+    currentFallbackCliTools = planResult.remainingFallbackTools;
+  }
 
   // Update state after initial plan generation
   executionState = {
@@ -540,10 +667,30 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         });
         
         // Get the appropriate CLI tool for plan operations
-        const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+        const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
+        const planToolType = currentPlanCliTool || specifiedCliTool;
         
         console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await planTool.execute(answerPrompt, planModel || undefined);
+        const answerContext: ExecutionContext = {
+          phase: 'answer-questions',
+          outputDirectory,
+          questionAnswerIteration: revisionCount,
+        };
+        const planResult = await executeWithFallback(
+          planTool,
+          planToolType,
+          answerPrompt,
+          currentPlanModel,
+          currentFallbackCliTools,
+          answerContext
+        );
+        
+        // Update mutable state if fallback occurred
+        if (planResult.fallbackOccurred) {
+          currentPlanCliTool = planResult.usedTool;
+          currentPlanModel = planResult.usedModel;
+          currentFallbackCliTools = planResult.remainingFallbackTools;
+        }
         
         revisionCount++;
         
@@ -572,10 +719,30 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         });
         
         // Get the appropriate CLI tool for plan operations
-        const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+        const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
+        const planToolType = currentPlanCliTool || specifiedCliTool;
         
         console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
-        await planTool.execute(improvePrompt, planModel || undefined);
+        const improveContext: ExecutionContext = {
+          phase: 'improve-plan',
+          outputDirectory,
+          improvePlanIteration: revisionCount,
+        };
+        const planResult = await executeWithFallback(
+          planTool,
+          planToolType,
+          improvePrompt,
+          currentPlanModel,
+          currentFallbackCliTools,
+          improveContext
+        );
+        
+        // Update mutable state if fallback occurred
+        if (planResult.fallbackOccurred) {
+          currentPlanCliTool = planResult.usedTool;
+          currentPlanModel = planResult.usedModel;
+          currentFallbackCliTools = planResult.remainingFallbackTools;
+        }
         
         revisionCount++;
         
@@ -659,21 +826,28 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       ? resolve(timestampDirectory, 'execute')
       : resolve(timestampDirectory, `execute-${execIterationCount}`);
     
-    // Update state before execution
+    // Check for existing artifacts to initialize state correctly
+    const existingArtifacts = getExecutionArtifacts(executeOutputDirectory, execIterationCount);
+    const initialFollowUpCount = existingArtifacts.lastFollowUpIteration !== null 
+      ? existingArtifacts.lastFollowUpIteration + 1 
+      : 0;
+    const initialHasDoneIteration0 = existingArtifacts.hasDoneIteration0;
+    
+    // Update state before execution (initialize from artifacts if they exist)
     executionState = {
       ...executionState,
       execution: {
         execIterationCount,
         currentPlanPath,
         executeOutputDirectory,
-        followUpIterationCount: 0,
-        hasDoneIteration0: false,
+        followUpIterationCount: initialFollowUpCount,
+        hasDoneIteration0: initialHasDoneIteration0,
       },
     };
     saveExecutionState(timestampDirectory, executionState);
     
     // Execute plan with follow-ups
-    await executePlanWithFollowUps(
+    const executeResult = await executePlanWithFollowUps(
       currentPlanPath,
       requirementsPath,
       executeOutputDirectory,
@@ -681,9 +855,18 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       specifiedCliTool,
       execIterationCount,
       isDestinyMode,
-      executeModel,
-      executeCliTool
+      currentExecuteModel,
+      currentExecuteCliTool,
+      currentFallbackCliTools
     );
+    
+    // Update mutable state if fallback occurred during execution
+    if (executeResult.executeCliTool !== currentExecuteCliTool || 
+        executeResult.executeModel !== currentExecuteModel) {
+      currentExecuteCliTool = executeResult.executeCliTool;
+      currentExecuteModel = executeResult.executeModel;
+      currentFallbackCliTools = executeResult.fallbackCliTools;
+    }
     
     // Sync state with artifacts after execution
     const syncedState = syncStateWithArtifacts(executionState, executeOutputDirectory, execIterationCount);
@@ -724,10 +907,31 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     });
     
     // Get the appropriate CLI tool for audit
-    const auditTool = await getCliToolForAction('audit', auditCliTool, specifiedCliTool);
+    const auditTool = await getCliToolForAction('audit', currentAuditCliTool, specifiedCliTool);
+    const auditToolType = currentAuditCliTool || specifiedCliTool;
     
-    // Execute using AI CLI tool with audit model if specified
-    await auditTool.execute(gapAuditPrompt, auditModel || undefined);
+    // Execute using AI CLI tool with audit model if specified, with fallback support
+    const auditContext: ExecutionContext = {
+      phase: 'gap-audit',
+      outputDirectory: gapAuditOutputDirectory,
+      executionIteration: execIterationCount,
+      gapAuditIteration: execIterationCount,
+    };
+    const auditResult = await executeWithFallback(
+      auditTool,
+      auditToolType,
+      gapAuditPrompt,
+      currentAuditModel,
+      currentFallbackCliTools,
+      auditContext
+    );
+    
+    // Update mutable state if fallback occurred
+    if (auditResult.fallbackOccurred) {
+      currentAuditCliTool = auditResult.usedTool;
+      currentAuditModel = auditResult.usedModel;
+      currentFallbackCliTools = auditResult.remainingFallbackTools;
+    }
     
     console.log('\n✅ Gap audit complete!');
     
@@ -788,10 +992,30 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       });
       
       // Get the appropriate CLI tool for plan operations
-      const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+      const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
+      const planToolType = currentPlanCliTool || specifiedCliTool;
       
-      // Execute using AI CLI tool with plan model if specified
-      await planTool.execute(gapPlanPrompt, planModel || undefined);
+      // Execute using AI CLI tool with plan model if specified, with fallback support
+      const gapPlanContext: ExecutionContext = {
+        phase: 'gap-plan',
+        outputDirectory: gapPlanOutputDirectory,
+        executionIteration: execIterationCount,
+      };
+      const planResult = await executeWithFallback(
+        planTool,
+        planToolType,
+        gapPlanPrompt,
+        currentPlanModel,
+        currentFallbackCliTools,
+        gapPlanContext
+      );
+      
+      // Update mutable state if fallback occurred
+      if (planResult.fallbackOccurred) {
+        currentPlanCliTool = planResult.usedTool;
+        currentPlanModel = planResult.usedModel;
+        currentFallbackCliTools = planResult.remainingFallbackTools;
+      }
       
       console.log('\n✅ Gap closure plan complete!');
       
@@ -837,9 +1061,30 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         });
         
         // Get the appropriate CLI tool for plan operations
-        const planTool = await getCliToolForAction('plan', planCliTool, specifiedCliTool);
+        const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
+        const planToolType = currentPlanCliTool || specifiedCliTool;
         
-        await planTool.execute(gapPlanPrompt, planModel || undefined);
+        const gapPlanContext: ExecutionContext = {
+          phase: 'gap-plan',
+          outputDirectory: gapPlanOutputDirectory,
+          executionIteration: execIterationCount,
+        };
+        const planResult = await executeWithFallback(
+          planTool,
+          planToolType,
+          gapPlanPrompt,
+          currentPlanModel,
+          currentFallbackCliTools,
+          gapPlanContext
+        );
+        
+        // Update mutable state if fallback occurred
+        if (planResult.fallbackOccurred) {
+          currentPlanCliTool = planResult.usedTool;
+          currentPlanModel = planResult.usedModel;
+          currentFallbackCliTools = planResult.remainingFallbackTools;
+        }
+        
         console.log('\n✅ Gap closure plan complete!');
         
         currentPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);

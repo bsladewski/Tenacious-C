@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { executePlan } from './commands/plan';
+import { setMockConfig, MockConfig } from './tools/mock-cli-tool';
+import { readFileSync } from 'fs';
 
 // Export the interface and implementation for use in other modules
 export { AICliTool } from './interfaces/ai-cli-tool';
@@ -30,7 +32,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude>] [--plan-cli-tool <codex|copilot|cursor|claude>] [--execute-cli-tool <codex|copilot|cursor|claude>] [--audit-cli-tool <codex|copilot|cursor|claude>] [--plan-model <model>] [--execute-model <model>] [--audit-model <model>] [--preview-plan] [--resume] [--the-prompt-of-destiny]');
+    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude|mock>] [--plan-cli-tool <codex|copilot|cursor|claude|mock>] [--execute-cli-tool <codex|copilot|cursor|claude|mock>] [--audit-cli-tool <codex|copilot|cursor|claude|mock>] [--plan-model <model>] [--execute-model <model>] [--audit-model <model>] [--fallback-cli-tools <tool1,tool2,...>] [--preview-plan] [--resume] [--the-prompt-of-destiny] [--mock] [--mock-config <json-string|file-path>]');
     console.error('');
     console.error('Examples:');
     console.error('  tenacious-c "Add user authentication"');
@@ -47,6 +49,8 @@ async function main() {
     console.error('  tenacious-c "Add user authentication" --preview-plan');
     console.error('  tenacious-c --resume');
     console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
+    console.error('  tenacious-c "Test task" --mock');
+    console.error('  tenacious-c "Test task" --mock --mock-config \'{"openQuestionIterations": 1}\'');
     console.error('');
     console.error('Options:');
     console.error('  --max-plan-iterations <number>      Maximum number of plan revisions (default: 10)');
@@ -60,9 +64,12 @@ async function main() {
     console.error('  --plan-model <model>               Model to use for plan generation and revisions (optional)');
     console.error('  --execute-model <model>            Model to use for plan execution and follow-ups (optional)');
     console.error('  --audit-model <model>               Model to use for gap audits (optional)');
+    console.error('  --fallback-cli-tools <tool1,tool2,...>  Comma-separated list of fallback CLI tools to try if primary tool fails');
     console.error('  --preview-plan                      Preview the initial plan before execution');
     console.error('  --resume                            Resume the most recent interrupted run');
     console.error('  --the-prompt-of-destiny             Override all iteration limits - continue until truly done');
+    console.error('  --mock                              Use mock CLI tool for testing (no AI costs)');
+    console.error('  --mock-config <json|file>           Mock tool configuration (JSON string or file path)');
     process.exit(1);
   }
 
@@ -73,15 +80,18 @@ async function main() {
   let maxFollowUpIterations = 10; // Default value
   let execIterations = 5; // Default value
   let thePromptOfDestiny = false; // Default value
-  let cliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
+  let cliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
   let planModel: string | null = null; // Default value
   let executeModel: string | null = null; // Default value
   let auditModel: string | null = null; // Default value
-  let planCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
-  let executeCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
-  let auditCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | null = null; // Default value
+  let planCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
+  let executeCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
+  let auditCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
   let previewPlan = false; // Default value
   let resume = false; // Default value
+  let fallbackCliTools: ('codex' | 'copilot' | 'cursor' | 'claude' | 'mock')[] = []; // Default value
+  let mockMode = false; // Default value
+  let mockConfigPath: string | null = null; // Default value
   
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -196,11 +206,11 @@ async function main() {
         console.error('Error: --cli-tool requires a value (codex, copilot, or cursor)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
       i++; // Skip the next argument as it's the value
     } else if (arg.startsWith('--cli-tool=')) {
       // Handle --cli-tool=copilot format
@@ -209,11 +219,11 @@ async function main() {
         console.error('Error: --cli-tool= requires a value (codex, copilot, or cursor)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
     } else if (arg === '--plan-model') {
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
@@ -268,11 +278,11 @@ async function main() {
         console.error('Error: --plan-cli-tool requires a value (codex, copilot, cursor, or claude)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
       i++; // Skip the next argument as it's the value
     } else if (arg.startsWith('--plan-cli-tool=')) {
       // Handle --plan-cli-tool=codex format
@@ -281,22 +291,22 @@ async function main() {
         console.error('Error: --plan-cli-tool= requires a value (codex, copilot, cursor, or claude)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
     } else if (arg === '--execute-cli-tool') {
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
         console.error('Error: --execute-cli-tool requires a value (codex, copilot, cursor, or claude)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
       i++; // Skip the next argument as it's the value
     } else if (arg.startsWith('--execute-cli-tool=')) {
       // Handle --execute-cli-tool=claude format
@@ -305,22 +315,22 @@ async function main() {
         console.error('Error: --execute-cli-tool= requires a value (codex, copilot, cursor, or claude)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
     } else if (arg === '--audit-cli-tool') {
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
         console.error('Error: --audit-cli-tool requires a value (codex, copilot, cursor, or claude)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
       i++; // Skip the next argument as it's the value
     } else if (arg.startsWith('--audit-cli-tool=')) {
       // Handle --audit-cli-tool=codex format
@@ -329,17 +339,69 @@ async function main() {
         console.error('Error: --audit-cli-tool= requires a value (codex, copilot, cursor, or claude)');
         process.exit(1);
       }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude') {
-        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", or "claude"');
+      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
+        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
         process.exit(1);
       }
-      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude';
+      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
+    } else if (arg === '--fallback-cli-tools') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --fallback-cli-tools requires a comma-separated list of tools (e.g., codex,cursor,claude)');
+        process.exit(1);
+      }
+      const tools = value.split(',').map(t => t.trim());
+      const validTools = ['codex', 'copilot', 'cursor', 'claude', 'mock'];
+      for (const tool of tools) {
+        if (!validTools.includes(tool)) {
+          console.error(`Error: Invalid fallback tool "${tool}". Must be one of: ${validTools.join(', ')}`);
+          process.exit(1);
+        }
+      }
+      fallbackCliTools = tools as ('codex' | 'copilot' | 'cursor' | 'claude' | 'mock')[];
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--fallback-cli-tools=')) {
+      // Handle --fallback-cli-tools=codex,cursor format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --fallback-cli-tools= requires a comma-separated list of tools (e.g., codex,cursor,claude)');
+        process.exit(1);
+      }
+      const tools = value.split(',').map(t => t.trim());
+      const validTools = ['codex', 'copilot', 'cursor', 'claude', 'mock'];
+      for (const tool of tools) {
+        if (!validTools.includes(tool)) {
+          console.error(`Error: Invalid fallback tool "${tool}". Must be one of: ${validTools.join(', ')}`);
+          process.exit(1);
+        }
+      }
+      fallbackCliTools = tools as ('codex' | 'copilot' | 'cursor' | 'claude' | 'mock')[];
     } else if (arg === '--preview-plan') {
       previewPlan = true;
     } else if (arg === '--resume') {
       resume = true;
     } else if (arg === '--the-prompt-of-destiny') {
       thePromptOfDestiny = true;
+    } else if (arg === '--mock') {
+      mockMode = true;
+      // Set cliTool to 'mock' when --mock is specified
+      cliTool = 'mock';
+    } else if (arg === '--mock-config') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --mock-config requires a JSON string or file path');
+        process.exit(1);
+      }
+      mockConfigPath = value;
+      i++; // Skip the next argument as it's the value
+    } else if (arg.startsWith('--mock-config=')) {
+      // Handle --mock-config=path format
+      const value = arg.split('=')[1];
+      if (!value) {
+        console.error('Error: --mock-config= requires a JSON string or file path');
+        process.exit(1);
+      }
+      mockConfigPath = value;
     } else {
       // It's part of the input prompt
       if (input) {
@@ -358,6 +420,29 @@ async function main() {
     console.log('\n🌟 The Prompt of Destiny activated! All iteration limits overridden. Continuing until truly done...');
   }
 
+  // Parse mock config if provided
+  if (mockConfigPath) {
+    try {
+      let configJson: string;
+      // Check if it's a file path or JSON string
+      if (mockConfigPath.startsWith('{') || mockConfigPath.startsWith('[')) {
+        // It's a JSON string
+        configJson = mockConfigPath;
+      } else {
+        // It's a file path
+        configJson = readFileSync(mockConfigPath, 'utf-8');
+      }
+      const config = JSON.parse(configJson) as Partial<MockConfig>;
+      setMockConfig(config);
+    } catch (error) {
+      console.error(`Error: Failed to parse mock config: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+  } else if (mockMode) {
+    // Mock mode enabled but no config provided - use defaults
+    setMockConfig(null);
+  }
+
   // If resume is set, input is not required
   if (!resume && !input) {
     console.error('Error: No prompt or file path provided');
@@ -366,7 +451,7 @@ async function main() {
 
   try {
     // If resume is set, input is ignored (can be empty string)
-    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume, planModel, executeModel, auditModel, planCliTool, executeCliTool, auditCliTool);
+    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume, planModel, executeModel, auditModel, planCliTool, executeCliTool, auditCliTool, fallbackCliTools);
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

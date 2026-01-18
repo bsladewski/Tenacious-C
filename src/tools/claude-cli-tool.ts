@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import ora from 'ora';
 import { AICliTool } from '../interfaces/ai-cli-tool';
+import { ExecutionContext } from '../interfaces/execution-context';
 
 /**
  * Implementation of AICliTool for Claude Code CLI
@@ -16,7 +17,7 @@ export class ClaudeCliTool implements AICliTool {
     this.workingDirectory = workingDirectory;
   }
 
-  async execute(prompt: string, model?: string): Promise<void> {
+  async execute(prompt: string, model?: string, context?: ExecutionContext): Promise<void> {
     const maxRetries = 2;
     let lastError: Error | null = null;
 

@@ -4,7 +4,7 @@ import { resolve } from 'path';
 const PREFERENCE_FILE = 'cli-tool-preference.json';
 const TENACIOUS_C_DIR = '.tenacious-c';
 
-export type CliToolType = 'codex' | 'copilot' | 'cursor' | 'claude';
+export type CliToolType = 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
 
 interface CliToolPreference {
   tool: CliToolType;
