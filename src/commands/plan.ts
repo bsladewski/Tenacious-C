@@ -686,11 +686,19 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     );
     
     // Sync state with artifacts after execution
-    executionState = syncStateWithArtifacts(executionState, executeOutputDirectory, execIterationCount);
+    const syncedState = syncStateWithArtifacts(executionState, executeOutputDirectory, execIterationCount);
+    
+    // Save synced state immediately if execution state changed
+    // Check if the execution properties actually changed (sync returns new object only if changed)
+    const stateChanged = syncedState.execution?.followUpIterationCount !== executionState.execution?.followUpIterationCount ||
+                         syncedState.execution?.hasDoneIteration0 !== executionState.execution?.hasDoneIteration0;
+    if (stateChanged) {
+      saveExecutionState(timestampDirectory, syncedState);
+    }
     
     // Update state after execution
     executionState = {
-      ...executionState,
+      ...syncedState,
       phase: 'gap-audit',
     };
     saveExecutionState(timestampDirectory, executionState);
