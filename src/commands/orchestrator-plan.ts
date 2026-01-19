@@ -443,8 +443,10 @@ async function handlePlanRevision(
     orchestrator.onPlanComplete(metadata.confidence);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
-      console.log('\n⚠️  Could not read plan-metadata.json. Proceeding to execution.');
-      orchestrator.onPlanComplete(100);
+      console.error('\n❌ Could not read plan-metadata.json. Cannot continue without metadata.');
+      console.error(`   Error: ${error.message}`);
+      console.error('   This may indicate the plan generation was interrupted.\n');
+      process.exit(1);
     } else {
       throw error;
     }
@@ -524,8 +526,10 @@ async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
     ctx.currentExecuteOutputDirectory = executeOutputDirectory;
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
-      console.log('\n⚠️  Could not read execute-metadata.json. Proceeding to gap audit.');
-      orchestrator.onExecutionComplete(false, false);
+      console.error('\n❌ Could not read execute-metadata.json. Cannot continue without metadata.');
+      console.error(`   Error: ${error.message}`);
+      console.error('   This may indicate the execution was interrupted.\n');
+      process.exit(1);
     } else {
       throw error;
     }
@@ -664,8 +668,10 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
     orchestrator.onFollowUpsComplete(updatedMetadata.hasFollowUps);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
-      console.log('\n⚠️  Could not read execute-metadata.json. Proceeding to gap audit.');
-      orchestrator.onFollowUpsComplete(false);
+      console.error('\n❌ Could not read execute-metadata.json. Cannot continue without metadata.');
+      console.error(`   Error: ${error.message}`);
+      console.error('   This may indicate the execution was interrupted.\n');
+      process.exit(1);
     } else {
       throw error;
     }

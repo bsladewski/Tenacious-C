@@ -379,13 +379,12 @@ export async function executePlanWithFollowUps(
 
       // Continue loop to check if there are still follow-ups
     } catch (error) {
-      // If metadata file doesn't exist or can't be read, just continue
-      // This allows the tool to work even if metadata wasn't generated
+      // If metadata file doesn't exist or can't be read, stop execution
       if (error instanceof Error && error.message.includes('not found')) {
-        if (followUpIterationCount === 0) {
-          console.log('\n⚠️  Could not read execute-metadata.json. Skipping follow-up iterations.');
-        }
-        break;
+        console.error('\n❌ Could not read execute-metadata.json. Cannot continue without metadata.');
+        console.error(`   Error: ${error.message}`);
+        console.error('   This may indicate the execution was interrupted.\n');
+        process.exit(1);
       } else {
         throw error;
       }
@@ -762,13 +761,12 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       // No open questions and confidence is above threshold - we're done!
       break;
     } catch (error) {
-      // If metadata file doesn't exist or can't be read, just continue
-      // This allows the tool to work even if metadata wasn't generated
+      // If metadata file doesn't exist or can't be read, stop execution
       if (error instanceof Error && error.message.includes('not found')) {
-        if (revisionCount === 0) {
-          console.log('\n⚠️  Could not read plan-metadata.json. Skipping revisions.');
-        }
-        break;
+        console.error('\n❌ Could not read plan-metadata.json. Cannot continue without metadata.');
+        console.error(`   Error: ${error.message}`);
+        console.error('   This may indicate the plan generation was interrupted.\n');
+        process.exit(1);
       } else {
         throw error;
       }

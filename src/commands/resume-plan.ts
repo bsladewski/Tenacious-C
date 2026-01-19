@@ -392,14 +392,10 @@ async function resumePlanGeneration(
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
         // If metadata doesn't exist, we can't continue with revisions
-        // This might happen if plan generation was interrupted before metadata was created
-        if (revisionCount === 0) {
-          console.log('\n⚠️  Could not read plan-metadata.json.');
-          console.log('   Plan may have been interrupted before metadata was generated.');
-          console.log('   The plan file exists, but we cannot verify it is complete.');
-        }
-        // Exit the loop - let the caller verify completion
-        break;
+        console.error('\n❌ Could not read plan-metadata.json. Cannot continue without metadata.');
+        console.error(`   Error: ${error.message}`);
+        console.error('   This may indicate the plan generation was interrupted.\n');
+        process.exit(1);
       } else {
         throw error;
       }
