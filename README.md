@@ -312,6 +312,55 @@ tenacious-c "Add user authentication" --mock --mock-config mock-config.json
 
 **Note:** Mock mode is automatically selected when you use `--mock` or `--cli-tool mock`. It generates realistic outputs to enable end-to-end testing of the full workflow without calling real AI tools.
 
+#### `--experimental-orchestrator`
+
+Use the experimental Orchestrator-based execution engine. This is a newer implementation that uses an explicit state machine for orchestration, providing better state management and resumability.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --experimental-orchestrator
+```
+
+**Note:** The experimental orchestrator is the recommended execution path for new runs. It provides improved state tracking, better error handling, and more reliable resume functionality.
+
+#### `--no-interactive`
+
+Disable interactive prompts and use defaults or fail if input is required. This is useful for scripted execution where user interaction is not possible.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --no-interactive
+```
+
+**Note:** When enabled, the tool will skip prompts for open questions and hard blockers, which may result in incomplete plans or execution failures.
+
+#### `--verbose`
+
+Enable verbose output with more progress details. Shows additional information about what the tool is doing at each step.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --verbose
+```
+
+#### `--debug`
+
+Enable debug mode with full diagnostics. Includes detailed logging, stack traces, and internal state information.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --debug
+```
+
+#### `--json`
+
+Output machine-readable JSON summary at the end of execution. The summary includes execution statistics, artifact paths, and completion status.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --json
+```
+
 ## How It Works
 
 ### Workflow Overview
@@ -326,6 +375,20 @@ Tenacious C follows a comprehensive workflow to ensure thorough plan generation 
 4. **Follow-Up Iterations**: Performs follow-up work to address blockers
 5. **Gap Analysis**: If gaps are found, performs gap audits and generates gap closure plans
 6. **Iterative Execution**: Repeats execution cycles until completion
+
+### Execution Modes
+
+Tenacious C supports two execution modes:
+
+**Legacy Mode (Default):** The original execution engine with implicit state management. This mode is still supported but is being phased out in favor of the orchestrator mode.
+
+**Orchestrator Mode (Experimental):** A newer execution engine that uses an explicit state machine for orchestration. This mode provides:
+- Better state tracking and resumability
+- More reliable error handling
+- Clearer state transitions
+- Improved debugging capabilities
+
+Enable orchestrator mode with the `--experimental-orchestrator` flag. This is the recommended mode for new runs.
 
 ### Plan Generation & Refinement
 
@@ -378,9 +441,21 @@ All outputs are stored in `.tenacious-c/<timestamp>/` where `<timestamp>` is an 
 - `.tenacious-c/<timestamp>/plan/plan-metadata.json` - Metadata including confidence and open questions
 
 **Execution outputs:**
-- `.tenacious-c/<timestamp>/execute-<iteration>/` - Execution outputs for each iteration
-- `.tenacious-c/<timestamp>/gap-audit-<iteration>/` - Gap audit outputs
-- `.tenacious-c/<timestamp>/gap-plan-<iteration>/` - Gap closure plan outputs
+- `.tenacious-c/<timestamp>/execute/` or `.tenacious-c/<timestamp>/execute-<iteration>/` - Execution outputs for each iteration
+  - `execution-summary-<iteration>.md` - Execution summary markdown
+  - `execution-summary-<iteration>-followup-<n>.md` - Follow-up iteration summaries
+  - `execute-metadata.json` - Execution metadata with blockers and follow-up status
+- `.tenacious-c/<timestamp>/gap-audit/` or `.tenacious-c/<timestamp>/gap-audit-<iteration>/` - Gap audit outputs
+  - `gap-audit-summary-<iteration>.md` - Gap audit summary markdown
+  - `gap-audit-metadata.json` - Gap audit metadata with gaps identified
+- `.tenacious-c/<timestamp>/gap-plan/` or `.tenacious-c/<timestamp>/gap-plan-<iteration>/` - Gap closure plan outputs
+  - `gap-plan-<iteration>.md` - Gap closure plan markdown
+  - `plan-metadata.json` - Plan metadata for gap closure plan
+
+**State and metadata:**
+- `.tenacious-c/<timestamp>/execution-state.json` - Execution state for resume functionality
+- `.tenacious-c/<timestamp>/requirements.txt` - Original requirements
+- `.tenacious-c/<timestamp>/qa-history.txt` - Question-answer history
 
 **Preferences:**
 - `.tenacious-c/cli-tool-preference.json` - Saved CLI tool preference
@@ -507,42 +582,117 @@ This builds and runs the tool in one command.
 
 ```
 src/
-  commands/
-    plan.ts                    # Main plan command implementation
-  interfaces/
-    ai-cli-tool.ts             # Interface for AI CLI tools
-  schemas/
+  cli/                         # CLI argument parsing and help
+    arg-parser.ts              # Command-line argument parser
+    help.ts                    # Help text generation
+    types.ts                   # CLI type definitions
+  commands/                    # Command implementations
+    plan.ts                    # Legacy plan command implementation
+    orchestrator-plan.ts       # Orchestrator-based plan execution
+    resume-plan.ts             # Resume interrupted execution
+  config/                      # Configuration management
+    cli-tool-preference.ts     # CLI tool preference persistence
+    resolve-config.ts           # Configuration resolution
+    write-effective-config.ts  # Effective config artifact writing
+  core/                        # Core orchestration logic
+    orchestrator.ts            # Main orchestrator class
+    state-machine.ts            # State machine implementation
+    iteration-policy.ts         # Iteration stop conditions
+    create-execution-state.ts  # Execution state creation
+    sync-state-with-artifacts.ts # State synchronization
+  engines/                     # AI engine adapters
+    engine-adapter.ts           # Base engine adapter interface
+    cursor-adapter.ts           # Cursor CLI adapter
+    copilot-adapter.ts          # Copilot CLI adapter
+    claude-adapter.ts           # Claude Code CLI adapter
+    codex-adapter.ts            # Codex CLI adapter
+    mock-adapter.ts             # Mock adapter for testing
+    get-cli-tool.ts             # CLI tool selection logic
+    detect-cli-tools.ts         # Tool availability detection
+    execute-with-fallback.ts    # Fallback execution logic
+  io/                          # File I/O and artifact management
+    file-naming.ts              # Artifact file naming utilities
+    find-latest-run.ts          # Find latest execution run
+    load-execution-state.ts     # Load execution state for resume
+    save-execution-state.ts     # Save execution state
+    read-metadata.ts            # Metadata reading utilities
+    read-execute-metadata.ts    # Execution metadata reading
+    read-gap-audit-metadata.ts  # Gap audit metadata reading
+    scan-execution-artifacts.ts # Scan execution artifacts
+    track-qa-history.ts         # Question-answer history tracking
+    write-requirements.ts        # Requirements file writing
+    real-file-system.ts         # Real filesystem implementation
+    memory-file-system.ts       # In-memory filesystem for testing
+  logging/                     # Logging and summaries
+    buffer-logger.ts            # Buffered logger
+    console-logger.ts           # Console logger
+    generate-final-summary.ts   # Final summary generation
+    run-summary.ts              # Run summary generation
+  orchestration/               # Orchestrator factory and setup
+    orchestrator-factory.ts     # Factory for creating orchestrators
+  schemas/                     # JSON schemas and validators
     plan-metadata.schema.ts    # Plan metadata JSON schema
-    execute-metadata.schema.ts # Execution metadata schema
+    execute-metadata.schema.ts  # Execution metadata schema
     gap-audit-metadata.schema.ts # Gap audit metadata schema
-  templates/
-    plan.template.ts           # Plan generation template
+    execution-state.schema.ts  # Execution state schema
+    validators.ts               # Schema validation utilities
+  templates/                   # Prompt templates
+    plan.template.ts            # Plan generation template
     answer-questions.template.ts # Question answering template
-    improve-plan.template.ts   # Plan improvement template
-    execute-plan.template.ts   # Plan execution template
+    improve-plan.template.ts    # Plan improvement template
+    execute-plan.template.ts    # Plan execution template
     execute-follow-ups.template.ts # Follow-up execution template
-    gap-audit.template.ts      # Gap audit template
-    gap-plan.template.ts       # Gap closure plan template
-    prompt-template.ts         # Template system utilities
-  tools/
-    codex-cli-tool.ts          # Codex CLI implementation
-    copilot-cli-tool.ts        # Copilot CLI implementation
-    cursor-cli-tool.ts         # Cursor CLI implementation
-    claude-cli-tool.ts         # Claude Code CLI implementation
-  utils/
-    get-cli-tool.ts            # CLI tool selection logic
-    detect-cli-tools.ts        # Tool availability detection
-    cli-tool-preference.ts     # Preference management
-    prompt-cli-tool.ts         # Tool selection prompt
-    prompt-questions.ts        # Question answering prompts
-    prompt-hard-blockers.ts    # Hard blocker resolution prompts
-    read-metadata.ts           # Metadata reading utilities
-    update-metadata.ts         # Metadata update utilities
-    read-execute-metadata.ts   # Execution metadata reading
-    read-gap-audit-metadata.ts # Gap audit metadata reading
-    track-qa-history.ts        # Question-answer history tracking
-    write-requirements.ts      # Requirements file writing
+    gap-audit.template.ts       # Gap audit template
+    gap-plan.template.ts        # Gap closure plan template
+    generate-summary.template.ts # Summary generation template
+    prompt-template.ts          # Template system utilities
+  types/                       # Type definitions
+    ai-cli-tool.ts              # AI CLI tool interface
+    execution-context.ts         # Execution context types
+    effective-config.ts         # Effective configuration type
+    engine-result.ts             # Engine execution result types
+    exit-codes.ts                # Exit code definitions
+    file-system.ts               # File system interface
+    logger.ts                    # Logger interface
+    process-runner.ts            # Process runner interface
+    prompter.ts                  # Prompter interface
+    clock.ts                     # Clock interface
+  ui/                          # User interface components
+    inquirer-prompter.ts        # Inquirer-based prompter
+    prompt-cli-tool.ts           # CLI tool selection prompt
+    prompt-questions.ts          # Question answering prompts
+    prompt-hard-blockers.ts      # Hard blocker resolution prompts
+    preview-plan.ts              # Plan preview functionality
+    spinner-service.ts           # Loading spinner service
   index.ts                     # Main entry point
+```
+
+## Exit Codes
+
+Tenacious C uses standardized exit codes to indicate execution results:
+
+- `0` - **SUCCESS**: Successful execution
+- `1` - **UNEXPECTED_ERROR**: Unexpected or unhandled error
+- `2` - **USAGE_ERROR**: Invalid CLI usage or missing requirements
+- `3` - **VALIDATION_ERROR**: Artifact schema or contract validation failed
+- `4` - **LIMIT_EXCEEDED**: Iteration limit exceeded without convergence
+- `5` - **ENGINE_ERROR**: Engine invocation failed
+
+These exit codes can be used in scripts to determine the outcome of execution:
+
+```bash
+if tenacious-c "Add feature" --no-interactive; then
+  echo "Success!"
+else
+  exit_code=$?
+  case $exit_code in
+    2) echo "Usage error - check your command" ;;
+    3) echo "Validation error - check artifacts" ;;
+    4) echo "Iteration limit reached" ;;
+    5) echo "Engine error - check AI tool configuration" ;;
+    *) echo "Unexpected error" ;;
+  esac
+fi
 ```
 
 ## License
