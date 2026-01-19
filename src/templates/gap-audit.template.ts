@@ -28,6 +28,12 @@ You MUST NOT modify any files besides the audit report and metadata JSON in \`{{
 You MUST NOT create TODO lists in the codebase.
 This command is for analysis and writing an audit report only.
 
+**CRITICAL ENVIRONMENT SAFETY RULES:**
+- **NEVER modify live environments** (production, staging, or any deployed environment)
+- **NEVER push code to remote origins** (no \`git push\`, \`git push origin\`, or any remote repository operations)
+- **NEVER deploy to any environment** (no deployment commands, CI/CD triggers, or environment modifications)
+- If gaps mention deployment or environment changes, they must be marked as requiring manual human intervention and should NOT be included as agent-actionable gaps
+
 ---
 
 ## Scope Detection
@@ -90,6 +96,8 @@ Identify gaps that represent:
 - Human judgment: "Check if the design looks good"
 - Manual testing: "Test the checkout flow with a real credit card"
 - Human review: "Have a team member review the security implications"
+- **Deployment to any environment: "Deploy to staging/production and verify"** - NEVER include deployment steps as gaps
+- **Pushing code to remote: "Push changes to remote repository"** - NEVER include git push operations as gaps
 - Things requiring human judgment without automated tooling
 
 **Rule:** If a gap requires manual human intervention and there's no automated tooling to support it, it should NOT be included as a gap. Only include gaps that the agent can address programmatically.

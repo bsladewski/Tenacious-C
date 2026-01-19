@@ -5,6 +5,11 @@
 
 export interface GapAuditMetadata {
   /**
+   * Schema version for forward compatibility
+   */
+  schemaVersion: '1.0.0';
+
+  /**
    * Whether any implementation/quality gaps were identified
    */
   gapsIdentified: boolean;
@@ -21,9 +26,14 @@ export interface GapAuditMetadata {
  */
 export const gapAuditMetadataJsonSchema = {
   type: 'object',
-  required: ['gapsIdentified', 'summary'],
+  required: ['schemaVersion', 'gapsIdentified', 'summary'],
   additionalProperties: false,
   properties: {
+    schemaVersion: {
+      type: 'string',
+      const: '1.0.0',
+      description: 'Schema version for forward compatibility',
+    },
     gapsIdentified: {
       type: 'boolean',
       description: 'Whether any implementation/quality gaps were identified',
@@ -48,6 +58,7 @@ export function getGapAuditMetadataSchemaString(): string {
  * Example of valid gap audit metadata
  */
 export const exampleGapAuditMetadata: GapAuditMetadata = {
+  schemaVersion: '1.0.0',
   gapsIdentified: false,
   summary: 'Completed comprehensive audit of the authentication implementation against the original requirements. Verified all core features are implemented, code quality meets standards, and tests are in place. No gaps identified - implementation is complete and ready for production.',
 };

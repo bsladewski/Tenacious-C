@@ -5,6 +5,11 @@
 
 export interface ExecuteMetadata {
   /**
+   * Schema version for forward compatibility
+   */
+  schemaVersion: '1.0.0';
+
+  /**
    * Whether any follow-ups exist (details are in execution-summary.md)
    */
   hasFollowUps: boolean;
@@ -41,9 +46,14 @@ export interface HardBlocker {
  */
 export const executeMetadataJsonSchema = {
   type: 'object',
-  required: ['hasFollowUps', 'hardBlockers', 'summary'],
+  required: ['schemaVersion', 'hasFollowUps', 'hardBlockers', 'summary'],
   additionalProperties: false,
   properties: {
+    schemaVersion: {
+      type: 'string',
+      const: '1.0.0',
+      description: 'Schema version for forward compatibility',
+    },
     hasFollowUps: {
       type: 'boolean',
       description: 'Whether any follow-ups exist (details are in execution-summary.md)',
@@ -90,6 +100,7 @@ export function getExecuteMetadataSchemaString(): string {
  * Example of valid execute metadata
  */
 export const exampleExecuteMetadata: ExecuteMetadata = {
+  schemaVersion: '1.0.0',
   hasFollowUps: false,
   hardBlockers: [],
   summary: 'Implemented user authentication system with JWT token generation and validation. Created login and registration API endpoints, added password hashing using bcrypt, and integrated session management middleware. All core authentication flows are now functional and tested.',

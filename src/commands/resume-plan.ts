@@ -1,20 +1,24 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { getCliTool, getCliToolForAction } from '../utils/get-cli-tool';
-import { CliToolType } from '../utils/cli-tool-preference';
-import { loadExecutionState } from '../utils/load-execution-state';
-import { saveExecutionState } from '../utils/save-execution-state';
-import { createExecutionState } from '../utils/create-execution-state';
+import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { CliToolType } from '../config';
+import {
+  loadExecutionState,
+  saveExecutionState,
+  readPlanMetadata,
+  clearOpenQuestions,
+  trackQAHistory,
+  readQAHistory,
+  readExecuteMetadata,
+  readGapAuditMetadata,
+  verifyGapAuditArtifacts,
+  verifyPlanFile,
+  getExecutionArtifacts,
+} from '../io';
+import { createExecutionState, syncStateWithArtifacts } from '../core';
 import { ExecutionState } from '../schemas/execution-state.schema';
-import { readPlanMetadata } from '../utils/read-metadata';
-import { clearOpenQuestions } from '../utils/update-metadata';
-import { promptForAnswers, formatAnswers } from '../utils/prompt-questions';
-import { trackQAHistory, readQAHistory } from '../utils/track-qa-history';
-import { readExecuteMetadata } from '../utils/read-execute-metadata';
-import { readGapAuditMetadata } from '../utils/read-gap-audit-metadata';
-import { generateFinalSummary } from '../utils/generate-final-summary';
-import { verifyGapAuditArtifacts, verifyPlanFile, getExecutionArtifacts } from '../utils/scan-execution-artifacts';
-import { syncStateWithArtifacts } from '../utils/sync-state-with-artifacts';
+import { promptForAnswers, formatAnswers } from '../ui';
+import { generateFinalSummary } from '../logging';
 import { getAnswerQuestionsTemplate } from '../templates/answer-questions.template';
 import { getImprovePlanTemplate } from '../templates/improve-plan.template';
 import { getGapAuditTemplate } from '../templates/gap-audit.template';
@@ -22,8 +26,7 @@ import { getGapPlanTemplate } from '../templates/gap-plan.template';
 import { getPlaceholderTemplate } from '../templates/plan.template';
 import { interpolateTemplate } from '../templates/prompt-template';
 import { executePlanWithFollowUps } from './plan';
-import { executeWithFallback } from '../utils/execute-with-fallback';
-import { ExecutionContext } from '../interfaces/execution-context';
+import { ExecutionContext } from '../types';
 
 /**
  * Format iteration display string (e.g., "1/5" or "1/🌟" in destiny mode)
@@ -50,7 +53,7 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
   
   // Resume based on phase
   if (state.phase === 'plan-generation' || state.phase === 'plan-revision') {
-    const planGenResult = await resumePlanGeneration(state, config.cliTool, maxRevisions, planConfidenceThreshold, isDestinyMode, config.planModel, config.planCliTool, config.fallbackCliTools || []);
+    await resumePlanGeneration(state, config.cliTool, maxRevisions, planConfidenceThreshold, isDestinyMode, config.planModel, config.planCliTool, config.fallbackCliTools || []);
     
     // Reload state in case it was updated during plan generation
     const reloadedState = loadExecutionState(timestampDirectory);
@@ -149,8 +152,8 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
   // Use default tool for summary generation
   console.log('\n📊 Generating execution summary...\n');
   try {
-    const defaultTool = await getCliTool(config.cliTool);
-    const summary = await generateFinalSummary(timestampDirectory, defaultTool);
+    const toolType = await selectCliTool(config.cliTool);
+    const summary = await generateFinalSummary(timestampDirectory, toolType);
     console.log(summary);
   } catch (error) {
     console.warn(`\n⚠️  Could not generate final summary: ${error instanceof Error ? error.message : String(error)}`);
@@ -389,14 +392,10 @@ async function resumePlanGeneration(
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
         // If metadata doesn't exist, we can't continue with revisions
-        // This might happen if plan generation was interrupted before metadata was created
-        if (revisionCount === 0) {
-          console.log('\n⚠️  Could not read plan-metadata.json.');
-          console.log('   Plan may have been interrupted before metadata was generated.');
-          console.log('   The plan file exists, but we cannot verify it is complete.');
-        }
-        // Exit the loop - let the caller verify completion
-        break;
+        console.error('\n❌ Could not read plan-metadata.json. Cannot continue without metadata.');
+        console.error(`   Error: ${error.message}`);
+        console.error('   This may indicate the plan generation was interrupted.\n');
+        process.exit(1);
       } else {
         throw error;
       }

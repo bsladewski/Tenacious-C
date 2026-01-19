@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve, isAbsolute } from 'path';
-import { getCliTool, getCliToolForAction } from '../utils/get-cli-tool';
-import { CliToolType } from '../utils/cli-tool-preference';
+import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { CliToolType } from '../config';
 import { getPlaceholderTemplate } from '../templates/plan.template';
 import { getAnswerQuestionsTemplate } from '../templates/answer-questions.template';
 import { getImprovePlanTemplate } from '../templates/improve-plan.template';
@@ -10,24 +10,23 @@ import { getExecuteFollowUpsTemplate } from '../templates/execute-follow-ups.tem
 import { getGapAuditTemplate } from '../templates/gap-audit.template';
 import { getGapPlanTemplate } from '../templates/gap-plan.template';
 import { interpolateTemplate } from '../templates/prompt-template';
-import { readPlanMetadata } from '../utils/read-metadata';
-import { clearOpenQuestions } from '../utils/update-metadata';
-import { promptForAnswers, formatAnswers } from '../utils/prompt-questions';
-import { writeRequirements } from '../utils/write-requirements';
-import { trackQAHistory, readQAHistory } from '../utils/track-qa-history';
-import { readExecuteMetadata } from '../utils/read-execute-metadata';
-import { readGapAuditMetadata } from '../utils/read-gap-audit-metadata';
-import { promptForHardBlockerResolution, formatHardBlockerResolutions } from '../utils/prompt-hard-blockers';
-import { generateFinalSummary } from '../utils/generate-final-summary';
-import { previewPlan } from '../utils/preview-plan';
-import { saveExecutionState } from '../utils/save-execution-state';
-import { findLatestResumableRun } from '../utils/find-latest-run';
-import { createExecutionState } from '../utils/create-execution-state';
+import {
+  readPlanMetadata,
+  clearOpenQuestions,
+  writeRequirements,
+  trackQAHistory,
+  readQAHistory,
+  readExecuteMetadata,
+  readGapAuditMetadata,
+  saveExecutionState,
+  findLatestResumableRun,
+  getExecutionArtifacts,
+} from '../io';
+import { createExecutionState, syncStateWithArtifacts } from '../core';
+import { promptForAnswers, formatAnswers, promptForHardBlockerResolution, formatHardBlockerResolutions, previewPlan } from '../ui';
+import { generateFinalSummary } from '../logging';
 import { resumePlan } from './resume-plan';
-import { getExecutionArtifacts } from '../utils/scan-execution-artifacts';
-import { syncStateWithArtifacts } from '../utils/sync-state-with-artifacts';
-import { executeWithFallback, createMutableToolConfig, updatePhaseAfterFallback, MutableToolConfig } from '../utils/execute-with-fallback';
-import { ExecutionContext } from '../interfaces/execution-context';
+import { ExecutionContext } from '../types';
 import inquirer from 'inquirer';
 
 /**
@@ -380,13 +379,12 @@ export async function executePlanWithFollowUps(
 
       // Continue loop to check if there are still follow-ups
     } catch (error) {
-      // If metadata file doesn't exist or can't be read, just continue
-      // This allows the tool to work even if metadata wasn't generated
+      // If metadata file doesn't exist or can't be read, stop execution
       if (error instanceof Error && error.message.includes('not found')) {
-        if (followUpIterationCount === 0) {
-          console.log('\n⚠️  Could not read execute-metadata.json. Skipping follow-up iterations.');
-        }
-        break;
+        console.error('\n❌ Could not read execute-metadata.json. Cannot continue without metadata.');
+        console.error(`   Error: ${error.message}`);
+        console.error('   This may indicate the execution was interrupted.\n');
+        process.exit(1);
       } else {
         throw error;
       }
@@ -444,7 +442,7 @@ export async function executePlanWithFollowUps(
  * @param executeCliTool - Optional CLI tool to use for execution/follow-ups (overrides specifiedCliTool)
  * @param auditCliTool - Optional CLI tool to use for gap audits (overrides specifiedCliTool)
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null, fallbackCliTools: CliToolType[] = []): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null, fallbackCliTools: CliToolType[] = [], _noInteractive: boolean = false, _verbose: boolean = false, _debug: boolean = false, _jsonOutput: boolean = false): Promise<void> {
   // If resume flag is set, find and resume the latest run
   if (resumeFlag) {
     const tenaciousCDir = resolve(process.cwd(), '.tenacious-c');
@@ -763,13 +761,12 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       // No open questions and confidence is above threshold - we're done!
       break;
     } catch (error) {
-      // If metadata file doesn't exist or can't be read, just continue
-      // This allows the tool to work even if metadata wasn't generated
+      // If metadata file doesn't exist or can't be read, stop execution
       if (error instanceof Error && error.message.includes('not found')) {
-        if (revisionCount === 0) {
-          console.log('\n⚠️  Could not read plan-metadata.json. Skipping revisions.');
-        }
-        break;
+        console.error('\n❌ Could not read plan-metadata.json. Cannot continue without metadata.');
+        console.error(`   Error: ${error.message}`);
+        console.error('   This may indicate the plan generation was interrupted.\n');
+        process.exit(1);
       } else {
         throw error;
       }
@@ -1109,8 +1106,8 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
   // Use default tool for summary generation
   console.log('\n📊 Generating execution summary...\n');
   try {
-    const defaultTool = await getCliTool(specifiedCliTool);
-    const summary = await generateFinalSummary(timestampDirectory, defaultTool);
+    const toolType = await selectCliTool(specifiedCliTool);
+    const summary = await generateFinalSummary(timestampDirectory, toolType);
     console.log(summary);
   } catch (error) {
     console.warn(`\n⚠️  Could not generate final summary: ${error instanceof Error ? error.message : String(error)}`);
