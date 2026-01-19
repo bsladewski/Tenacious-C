@@ -5,6 +5,11 @@
 
 export interface PlanMetadata {
   /**
+   * Schema version for forward compatibility
+   */
+  schemaVersion: '1.0.0';
+
+  /**
    * Confidence level (0-100) in the plan's completeness and accuracy
    */
   confidence: number;
@@ -38,9 +43,14 @@ export interface OpenQuestion {
  */
 export const planMetadataJsonSchema = {
   type: 'object',
-  required: ['confidence', 'openQuestions', 'summary'],
+  required: ['schemaVersion', 'confidence', 'openQuestions', 'summary'],
   additionalProperties: false,
   properties: {
+    schemaVersion: {
+      type: 'string',
+      const: '1.0.0',
+      description: 'Schema version for forward compatibility',
+    },
     confidence: {
       type: 'number',
       minimum: 0,
@@ -92,6 +102,7 @@ export function getPlanMetadataSchemaString(): string {
  * Example of valid plan metadata
  */
 export const examplePlanMetadata: PlanMetadata = {
+  schemaVersion: '1.0.0',
   confidence: 80,
   openQuestions: [
     {

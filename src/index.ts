@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 
 import { executePlan } from './commands/plan';
-import { setMockConfig, MockConfig } from './tools/mock-cli-tool';
+import { executePlanWithOrchestrator } from './commands/orchestrator-plan';
+import { setMockConfig, MockConfig } from './engines/mock-config';
 import { readFileSync } from 'fs';
+import { parseArgs, printUsage } from './cli';
 
 // Export the interface and implementation for use in other modules
-export { AICliTool } from './interfaces/ai-cli-tool';
-export { CodexCliTool } from './tools/codex-cli-tool';
-export { CopilotCliTool } from './tools/copilot-cli-tool';
-export { CursorCliTool } from './tools/cursor-cli-tool';
-export { ClaudeCliTool } from './tools/claude-cli-tool';
+export { AICliTool } from './types/ai-cli-tool';
+export { ExecutionContext } from './types/execution-context';
 
 // Export plan command
 export { executePlan } from './commands/plan';
@@ -27,410 +26,76 @@ export {
   examplePlanMetadata,
 } from './schemas/plan-metadata.schema';
 
+// Export CLI module
+export { parseArgs, printUsage } from './cli';
+export type { ParsedArgs, ParseResult, CliToolName } from './cli';
+
+// Export engine adapters (new architecture)
+export {
+  EngineAdapter,
+  BaseEngineAdapter,
+  CursorAdapter,
+  ClaudeAdapter,
+  CodexAdapter,
+  CopilotAdapter,
+  MockAdapter,
+  createCursorAdapter,
+  createClaudeAdapter,
+  createCodexAdapter,
+  createCopilotAdapter,
+  createMockAdapter,
+} from './engines';
+
 // Main CLI entry point
 async function main() {
-  const args = process.argv.slice(2);
+  // Parse arguments using the new CLI parser
+  const result = parseArgs(process.argv);
 
-  if (args.length === 0) {
-    console.error('Usage: tenacious-c <prompt|file-path> [--max-plan-iterations <number>] [--plan-confidence <number>] [--max-follow-up-iterations <number>] [--exec-iterations <number>] [--cli-tool <codex|copilot|cursor|claude|mock>] [--plan-cli-tool <codex|copilot|cursor|claude|mock>] [--execute-cli-tool <codex|copilot|cursor|claude|mock>] [--audit-cli-tool <codex|copilot|cursor|claude|mock>] [--plan-model <model>] [--execute-model <model>] [--audit-model <model>] [--fallback-cli-tools <tool1,tool2,...>] [--preview-plan] [--resume] [--the-prompt-of-destiny] [--mock] [--mock-config <json-string|file-path>]');
-    console.error('');
-    console.error('Examples:');
-    console.error('  tenacious-c "Add user authentication"');
-    console.error('  tenacious-c requirements.txt');
-    console.error('  tenacious-c "Add user authentication" --max-plan-iterations 5');
-    console.error('  tenacious-c "Add user authentication" --plan-confidence 90');
-    console.error('  tenacious-c "Add user authentication" --max-follow-up-iterations 15');
-    console.error('  tenacious-c "Add user authentication" --exec-iterations 3');
-    console.error('  tenacious-c "Add user authentication" --cli-tool copilot');
-    console.error('  tenacious-c "Add user authentication" --cli-tool cursor');
-    console.error('  tenacious-c "Add user authentication" --cli-tool claude');
-    console.error('  tenacious-c "Add user authentication" --plan-model sonnet-4.5 --execute-model opus-4.5-thinking --audit-model gpt-5.2-codex');
-    console.error('  tenacious-c "Add user authentication" --plan-cli-tool codex --execute-cli-tool claude --audit-cli-tool codex');
-    console.error('  tenacious-c "Add user authentication" --preview-plan');
-    console.error('  tenacious-c --resume');
-    console.error('  tenacious-c "Add user authentication" --the-prompt-of-destiny');
-    console.error('  tenacious-c "Test task" --mock');
-    console.error('  tenacious-c "Test task" --mock --mock-config \'{"openQuestionIterations": 1}\'');
-    console.error('');
-    console.error('Options:');
-    console.error('  --max-plan-iterations <number>      Maximum number of plan revisions (default: 10)');
-    console.error('  --plan-confidence <number>          Minimum confidence threshold (0-100) (default: 85)');
-    console.error('  --max-follow-up-iterations <number>  Maximum number of follow-up execution iterations (default: 10)');
-    console.error('  --exec-iterations <number>          Maximum number of plan-based execution iterations (default: 5)');
-    console.error('  --cli-tool <codex|copilot|cursor|claude>  CLI tool to use (default: auto-detect or prompt, saved as preference)');
-    console.error('  --plan-cli-tool <codex|copilot|cursor|claude>  CLI tool to use for plan generation/revisions (overrides --cli-tool, not saved)');
-    console.error('  --execute-cli-tool <codex|copilot|cursor|claude>  CLI tool to use for execution/follow-ups (overrides --cli-tool, not saved)');
-    console.error('  --audit-cli-tool <codex|copilot|cursor|claude>  CLI tool to use for gap audits (overrides --cli-tool, not saved)');
-    console.error('  --plan-model <model>               Model to use for plan generation and revisions (optional)');
-    console.error('  --execute-model <model>            Model to use for plan execution and follow-ups (optional)');
-    console.error('  --audit-model <model>               Model to use for gap audits (optional)');
-    console.error('  --fallback-cli-tools <tool1,tool2,...>  Comma-separated list of fallback CLI tools to try if primary tool fails');
-    console.error('  --preview-plan                      Preview the initial plan before execution');
-    console.error('  --resume                            Resume the most recent interrupted run');
-    console.error('  --the-prompt-of-destiny             Override all iteration limits - continue until truly done');
-    console.error('  --mock                              Use mock CLI tool for testing (no AI costs)');
-    console.error('  --mock-config <json|file>           Mock tool configuration (JSON string or file path)');
+  // Handle parse errors
+  if (!result.success) {
+    console.error(result.error);
+    printUsage();
     process.exit(1);
   }
 
-  // Parse arguments
-  let input = '';
-  let maxRevisions = 10; // Default value
-  let planConfidence = 85; // Default value
-  let maxFollowUpIterations = 10; // Default value
-  let execIterations = 5; // Default value
-  let thePromptOfDestiny = false; // Default value
-  let cliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
-  let planModel: string | null = null; // Default value
-  let executeModel: string | null = null; // Default value
-  let auditModel: string | null = null; // Default value
-  let planCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
-  let executeCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
-  let auditCliTool: 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock' | null = null; // Default value
-  let previewPlan = false; // Default value
-  let resume = false; // Default value
-  let fallbackCliTools: ('codex' | 'copilot' | 'cursor' | 'claude' | 'mock')[] = []; // Default value
-  let mockMode = false; // Default value
-  let mockConfigPath: string | null = null; // Default value
-  
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    
-    if (arg === '--max-plan-iterations') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --max-plan-iterations requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed < 1) {
-        console.error('Error: --max-plan-iterations must be a positive integer');
-        process.exit(1);
-      }
-      maxRevisions = parsed;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--max-plan-iterations=')) {
-      // Handle --max-plan-iterations=5 format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --max-plan-iterations= requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed < 1) {
-        console.error('Error: --max-plan-iterations must be a positive integer');
-        process.exit(1);
-      }
-      maxRevisions = parsed;
-    } else if (arg === '--plan-confidence') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --plan-confidence requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseFloat(value);
-      if (isNaN(parsed) || parsed < 0 || parsed > 100) {
-        console.error('Error: --plan-confidence must be a number between 0 and 100');
-        process.exit(1);
-      }
-      planConfidence = parsed;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--plan-confidence=')) {
-      // Handle --plan-confidence=85 format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --plan-confidence= requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseFloat(value);
-      if (isNaN(parsed) || parsed < 0 || parsed > 100) {
-        console.error('Error: --plan-confidence must be a number between 0 and 100');
-        process.exit(1);
-      }
-      planConfidence = parsed;
-    } else if (arg === '--max-follow-up-iterations') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --max-follow-up-iterations requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed < 1) {
-        console.error('Error: --max-follow-up-iterations must be a positive integer');
-        process.exit(1);
-      }
-      maxFollowUpIterations = parsed;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--max-follow-up-iterations=')) {
-      // Handle --max-follow-up-iterations=10 format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --max-follow-up-iterations= requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed < 1) {
-        console.error('Error: --max-follow-up-iterations must be a positive integer');
-        process.exit(1);
-      }
-      maxFollowUpIterations = parsed;
-    } else if (arg === '--exec-iterations') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --exec-iterations requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed < 1) {
-        console.error('Error: --exec-iterations must be a positive integer');
-        process.exit(1);
-      }
-      execIterations = parsed;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--exec-iterations=')) {
-      // Handle --exec-iterations=5 format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --exec-iterations= requires a number value');
-        process.exit(1);
-      }
-      const parsed = parseInt(value, 10);
-      if (isNaN(parsed) || parsed < 1) {
-        console.error('Error: --exec-iterations must be a positive integer');
-        process.exit(1);
-      }
-      execIterations = parsed;
-    } else if (arg === '--cli-tool') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --cli-tool requires a value (codex, copilot, or cursor)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--cli-tool=')) {
-      // Handle --cli-tool=copilot format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --cli-tool= requires a value (codex, copilot, or cursor)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      cliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-    } else if (arg === '--plan-model') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --plan-model requires a model name value');
-        process.exit(1);
-      }
-      planModel = value;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--plan-model=')) {
-      // Handle --plan-model=sonnet-4.5 format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --plan-model= requires a model name value');
-        process.exit(1);
-      }
-      planModel = value;
-    } else if (arg === '--execute-model') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --execute-model requires a model name value');
-        process.exit(1);
-      }
-      executeModel = value;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--execute-model=')) {
-      // Handle --execute-model=opus-4.5-thinking format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --execute-model= requires a model name value');
-        process.exit(1);
-      }
-      executeModel = value;
-    } else if (arg === '--audit-model') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --audit-model requires a model name value');
-        process.exit(1);
-      }
-      auditModel = value;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--audit-model=')) {
-      // Handle --audit-model=gpt-5.2-codex format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --audit-model= requires a model name value');
-        process.exit(1);
-      }
-      auditModel = value;
-    } else if (arg === '--plan-cli-tool') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --plan-cli-tool requires a value (codex, copilot, cursor, or claude)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--plan-cli-tool=')) {
-      // Handle --plan-cli-tool=codex format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --plan-cli-tool= requires a value (codex, copilot, cursor, or claude)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --plan-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      planCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-    } else if (arg === '--execute-cli-tool') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --execute-cli-tool requires a value (codex, copilot, cursor, or claude)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--execute-cli-tool=')) {
-      // Handle --execute-cli-tool=claude format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --execute-cli-tool= requires a value (codex, copilot, cursor, or claude)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --execute-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      executeCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-    } else if (arg === '--audit-cli-tool') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --audit-cli-tool requires a value (codex, copilot, cursor, or claude)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--audit-cli-tool=')) {
-      // Handle --audit-cli-tool=codex format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --audit-cli-tool= requires a value (codex, copilot, cursor, or claude)');
-        process.exit(1);
-      }
-      if (value !== 'codex' && value !== 'copilot' && value !== 'cursor' && value !== 'claude' && value !== 'mock') {
-        console.error('Error: --audit-cli-tool must be one of "codex", "copilot", "cursor", "claude", or "mock"');
-        process.exit(1);
-      }
-      auditCliTool = value as 'codex' | 'copilot' | 'cursor' | 'claude' | 'mock';
-    } else if (arg === '--fallback-cli-tools') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --fallback-cli-tools requires a comma-separated list of tools (e.g., codex,cursor,claude)');
-        process.exit(1);
-      }
-      const tools = value.split(',').map(t => t.trim());
-      const validTools = ['codex', 'copilot', 'cursor', 'claude', 'mock'];
-      for (const tool of tools) {
-        if (!validTools.includes(tool)) {
-          console.error(`Error: Invalid fallback tool "${tool}". Must be one of: ${validTools.join(', ')}`);
-          process.exit(1);
-        }
-      }
-      fallbackCliTools = tools as ('codex' | 'copilot' | 'cursor' | 'claude' | 'mock')[];
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--fallback-cli-tools=')) {
-      // Handle --fallback-cli-tools=codex,cursor format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --fallback-cli-tools= requires a comma-separated list of tools (e.g., codex,cursor,claude)');
-        process.exit(1);
-      }
-      const tools = value.split(',').map(t => t.trim());
-      const validTools = ['codex', 'copilot', 'cursor', 'claude', 'mock'];
-      for (const tool of tools) {
-        if (!validTools.includes(tool)) {
-          console.error(`Error: Invalid fallback tool "${tool}". Must be one of: ${validTools.join(', ')}`);
-          process.exit(1);
-        }
-      }
-      fallbackCliTools = tools as ('codex' | 'copilot' | 'cursor' | 'claude' | 'mock')[];
-    } else if (arg === '--preview-plan') {
-      previewPlan = true;
-    } else if (arg === '--resume') {
-      resume = true;
-    } else if (arg === '--the-prompt-of-destiny') {
-      thePromptOfDestiny = true;
-    } else if (arg === '--mock') {
-      mockMode = true;
-      // Set cliTool to 'mock' when --mock is specified
-      cliTool = 'mock';
-    } else if (arg === '--mock-config') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('--')) {
-        console.error('Error: --mock-config requires a JSON string or file path');
-        process.exit(1);
-      }
-      mockConfigPath = value;
-      i++; // Skip the next argument as it's the value
-    } else if (arg.startsWith('--mock-config=')) {
-      // Handle --mock-config=path format
-      const value = arg.split('=')[1];
-      if (!value) {
-        console.error('Error: --mock-config= requires a JSON string or file path');
-        process.exit(1);
-      }
-      mockConfigPath = value;
-    } else {
-      // It's part of the input prompt
-      if (input) {
-        input += ' ' + arg;
-      } else {
-        input = arg;
-      }
-    }
+  const args = result.args!;
+
+  // Handle --help flag
+  if (args.help) {
+    printUsage();
+    process.exit(0);
   }
-  
-  // If --the-prompt-of-destiny is set, override all iteration limits
-  if (thePromptOfDestiny) {
-    maxRevisions = Number.MAX_SAFE_INTEGER;
-    maxFollowUpIterations = Number.MAX_SAFE_INTEGER;
-    execIterations = Number.MAX_SAFE_INTEGER;
+
+  // Handle --version flag
+  if (args.version) {
+    const path = await import('path');
+    const pkg = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
+    console.log(pkg.version);
+    process.exit(0);
+  }
+
+  // Handle no arguments case
+  if (process.argv.length <= 2 && !args.resume) {
+    printUsage();
+    process.exit(1);
+  }
+
+  // If --the-prompt-of-destiny is set, notify user (values already overridden by parser)
+  if (args.thePromptOfDestiny) {
     console.log('\n🌟 The Prompt of Destiny activated! All iteration limits overridden. Continuing until truly done...');
   }
 
   // Parse mock config if provided
-  if (mockConfigPath) {
+  if (args.mockConfigPath) {
     try {
       let configJson: string;
       // Check if it's a file path or JSON string
-      if (mockConfigPath.startsWith('{') || mockConfigPath.startsWith('[')) {
+      if (args.mockConfigPath.startsWith('{') || args.mockConfigPath.startsWith('[')) {
         // It's a JSON string
-        configJson = mockConfigPath;
+        configJson = args.mockConfigPath;
       } else {
         // It's a file path
-        configJson = readFileSync(mockConfigPath, 'utf-8');
+        configJson = readFileSync(args.mockConfigPath, 'utf-8');
       }
       const config = JSON.parse(configJson) as Partial<MockConfig>;
       setMockConfig(config);
@@ -438,20 +103,70 @@ async function main() {
       console.error(`Error: Failed to parse mock config: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
-  } else if (mockMode) {
+  } else if (args.mockMode) {
     // Mock mode enabled but no config provided - use defaults
     setMockConfig(null);
   }
 
   // If resume is set, input is not required
-  if (!resume && !input) {
+  if (!args.resume && !args.input) {
     console.error('Error: No prompt or file path provided');
+    printUsage();
     process.exit(1);
   }
 
   try {
-    // If resume is set, input is ignored (can be empty string)
-    await executePlan(resume ? '' : input, maxRevisions, planConfidence, maxFollowUpIterations, execIterations, thePromptOfDestiny, cliTool, previewPlan, resume, planModel, executeModel, auditModel, planCliTool, executeCliTool, auditCliTool, fallbackCliTools);
+    // Choose execution path based on experimental flag
+    if (args.experimentalOrchestrator) {
+      // Use the new Orchestrator-based execution
+      await executePlanWithOrchestrator(
+        args.resume ? '' : args.input,
+        args.maxPlanIterations,
+        args.planConfidence,
+        args.maxFollowUpIterations,
+        args.execIterations,
+        args.thePromptOfDestiny,
+        args.cliTool,
+        args.previewPlan,
+        args.resume,
+        args.planModel,
+        args.executeModel,
+        args.auditModel,
+        args.planCliTool,
+        args.executeCliTool,
+        args.auditCliTool,
+        args.fallbackCliTools,
+        args.noInteractive,
+        args.verbose,
+        args.debug,
+        args.jsonOutput
+      );
+    } else {
+      // Use the legacy execution path
+      // If resume is set, input is ignored (can be empty string)
+      await executePlan(
+        args.resume ? '' : args.input,
+        args.maxPlanIterations,
+        args.planConfidence,
+        args.maxFollowUpIterations,
+        args.execIterations,
+        args.thePromptOfDestiny,
+        args.cliTool,
+        args.previewPlan,
+        args.resume,
+        args.planModel,
+        args.executeModel,
+        args.auditModel,
+        args.planCliTool,
+        args.executeCliTool,
+        args.auditCliTool,
+        args.fallbackCliTools,
+        args.noInteractive,
+        args.verbose,
+        args.debug,
+        args.jsonOutput
+      );
+    }
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
