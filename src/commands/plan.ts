@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve, isAbsolute } from 'path';
-import { getCliTool, getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
 import { CliToolType } from '../config';
 import { getPlaceholderTemplate } from '../templates/plan.template';
 import { getAnswerQuestionsTemplate } from '../templates/answer-questions.template';

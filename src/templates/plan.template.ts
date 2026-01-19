@@ -34,6 +34,13 @@ Follow instruction precedence (highest to lowest):
 **CRITICAL PLANNING RULE:**  
 You MUST NOT modify any files besides the plan markdown and metadata JSON in \`{{outputDirectory}}\`.
 
+**CRITICAL ENVIRONMENT SAFETY RULES:**
+- **NEVER modify live environments** (production, staging, or any deployed environment)
+- **NEVER push code to remote origins** (no \`git push\`, \`git push origin\`, or any remote repository operations)
+- **NEVER deploy to any environment** (no deployment commands, CI/CD triggers, or environment modifications)
+- If the plan requires deployment or environment changes, convert them into **manual review steps** that explicitly state "REQUIRES MANUAL REVIEW - DO NOT EXECUTE AUTOMATICALLY"
+- If follow-ups mention deployment or pushing code, they must be marked as requiring manual human intervention and should NOT be included as agent-actionable items
+
 If requirements are incomplete or ambiguous, STOP and ask clarifying questions before producing the final plan. If requirements are very brief (e.g., a ticket ID), first restate inferred requirements and assumptions.
 
 ---

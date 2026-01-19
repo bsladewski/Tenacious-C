@@ -91,6 +91,13 @@ As you work:
 - Update/add tests to maintain coverage standards and prevent regressions
 - Maintain architecture/layering, security, structured errors, and i18n/a11y/routing conventions per repo rules where applicable
 
+**CRITICAL ENVIRONMENT SAFETY RULES:**
+- **NEVER modify live environments** (production, staging, or any deployed environment)
+- **NEVER push code to remote origins** (no \`git push\`, \`git push origin\`, or any remote repository operations)
+- **NEVER deploy to any environment** (no deployment commands, CI/CD triggers, or environment modifications)
+- If the plan includes deployment or environment changes, **SKIP those steps** and document them as requiring manual human intervention
+- If follow-ups mention deployment or pushing code, they must be marked as requiring manual human intervention and should NOT be included as agent-actionable items
+
 ---
 
 ## Test Strategy
@@ -183,7 +190,8 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 - Manual verification across devices: "Verify UI changes on iPhone, iPad, and Android devices"
 - Manual testing that can't be automated: "Manually test the checkout flow with a real credit card"
 - Human review/approval: "Have a team member review the security implications"
-- Manual deployment steps: "Deploy to staging and manually verify"
+- **Deployment to any environment: "Deploy to staging/production and manually verify"** - NEVER include deployment steps as follow-ups
+- **Pushing code to remote: "Push changes to remote repository"** - NEVER include git push operations as follow-ups
 - Things requiring human judgment without automated tooling: "Check if the design looks good on mobile"
 
 **Rule:** If a follow-up requires manual human intervention and there's no automated tooling to support it, it should NOT be included as a follow-up. Only include follow-ups that the agent can execute programmatically.

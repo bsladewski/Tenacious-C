@@ -35,7 +35,7 @@ import {
 } from '../io';
 import { promptForAnswers, formatAnswers, promptForHardBlockerResolution, formatHardBlockerResolutions, previewPlan } from '../ui';
 import { generateFinalSummary } from '../logging';
-import { getCliTool, getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
 import inquirer from 'inquirer';
 
 /**

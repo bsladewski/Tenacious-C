@@ -33,6 +33,13 @@ Follow instruction precedence (highest to lowest):
 **CRITICAL PLANNING RULE:**  
 You MUST NOT modify any files besides the plan markdown in \`{{outputDirectory}}\`.
 
+**CRITICAL ENVIRONMENT SAFETY RULES:**
+- **NEVER modify live environments** (production, staging, or any deployed environment)
+- **NEVER push code to remote origins** (no \`git push\`, \`git push origin\`, or any remote repository operations)
+- **NEVER deploy to any environment** (no deployment commands, CI/CD triggers, or environment modifications)
+- If gap audit findings mention deployment or environment changes, convert them into **manual review steps** that explicitly state "REQUIRES MANUAL REVIEW - DO NOT EXECUTE AUTOMATICALLY"
+- If the plan requires deployment or pushing code, those steps must be marked as requiring manual human intervention
+
 **Important:** All requirements are internal to the tool - there are no open questions or ambiguities. Create a complete, actionable plan to address all identified gaps.
 
 ---

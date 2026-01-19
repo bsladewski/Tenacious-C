@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { getCliTool, getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
 import { CliToolType } from '../config';
 import {
   loadExecutionState,
