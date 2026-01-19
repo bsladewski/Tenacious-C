@@ -87,5 +87,7 @@ export function getMockConfig(): Partial<MockConfig> | null {
  * Get the effective mock config (merging global config with defaults)
  */
 export function getEffectiveMockConfig(overrides: Partial<MockConfig> = {}): MockConfig {
-  return { ...DEFAULT_MOCK_CONFIG, ...globalMockConfig, ...overrides };
+  // If globalMockConfig is null, use defaults only
+  const globalConfig = globalMockConfig ?? {};
+  return { ...DEFAULT_MOCK_CONFIG, ...globalConfig, ...overrides };
 }

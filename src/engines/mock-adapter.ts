@@ -88,7 +88,6 @@ export class MockAdapter implements EngineAdapter {
   private readonly responseMap: Map<RegExp | string, MockAdapterResponse>;
   private readonly available: boolean;
   private readonly versionString: string | undefined;
-  private readonly config: MockConfig;
 
   /** History of all executions for test assertions */
   public readonly executionHistory: Array<{
@@ -105,7 +104,13 @@ export class MockAdapter implements EngineAdapter {
     this.responseMap = options.responseMap ?? new Map();
     this.available = options.isAvailable ?? true;
     this.versionString = options.version ?? 'mock-1.0.0';
-    this.config = getEffectiveMockConfig();
+  }
+
+  /**
+   * Get the current mock config (reads from global config dynamically)
+   */
+  private get config(): MockConfig {
+    return getEffectiveMockConfig();
   }
 
   async execute(options: EngineExecutionOptions): Promise<EngineResult> {
@@ -214,7 +219,10 @@ export class MockAdapter implements EngineAdapter {
     switch (mode) {
       case 'execute':
         // Within execute mode, use prompt text to distinguish execute-plan vs execute-follow-ups
-        if (userMessage.includes('follow-up') || userMessage.includes('Follow-Up') || userMessage.includes('followup')) {
+        // Check for the specific pattern that indicates execute-follow-ups (more specific than just "follow-up")
+        if (userMessage.includes('executing follow-up items from a previous execution run') || 
+            userMessage.includes('executing follow-up items from a previous execution') ||
+            userMessage.includes('previous execution summary is located')) {
           return 'execute-follow-ups';
         }
         // Default to execute-plan for execute mode
@@ -272,7 +280,10 @@ export class MockAdapter implements EngineAdapter {
     // Use template markers to detect phase
     if (prompt.includes('gap-audit') || prompt.includes('Gap Audit')) return 'gap-audit';
     if (prompt.includes('gap-plan') || prompt.includes('Gap Closure Plan')) return 'gap-plan';
-    if (prompt.includes('follow-up') || prompt.includes('Follow-Up') || prompt.includes('followup')) return 'execute-follow-ups';
+    // Check for the specific pattern that indicates execute-follow-ups (more specific than just "follow-up")
+    if (prompt.includes('executing follow-up items from a previous execution run') || 
+        prompt.includes('executing follow-up items from a previous execution') ||
+        prompt.includes('previous execution summary is located')) return 'execute-follow-ups';
     if (prompt.includes('Execute the plan') || prompt.includes('execute-plan')) return 'execute-plan';
     if (prompt.includes('answers') && prompt.includes('revise')) return 'answer-questions';
     if (prompt.includes('improve') || prompt.includes('deepen')) return 'improve-plan';

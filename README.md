@@ -258,6 +258,60 @@ Override all iteration limits. When enabled, the tool will continue iterating un
 tenacious-c "Add user authentication" --the-prompt-of-destiny
 ```
 
+#### `--mock`
+
+Enable mock mode for testing. Mock mode simulates the full execution workflow without calling real AI tools, making it ideal for:
+- Testing the tool's workflow and logic
+- Development and debugging
+- Learning how the tool works
+- Avoiding AI API costs during testing
+
+When mock mode is enabled, the tool generates realistic file outputs (plan.md, plan-metadata.json, execute-metadata.json, etc.) to simulate a complete execution cycle.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --mock
+```
+
+#### `--mock-config <json|file>`
+
+Configure mock mode behavior. You can provide either a JSON string or a path to a JSON file containing mock configuration options.
+
+**Configuration Options:**
+- `openQuestionIterations` (number, default: 2) - Number of times to output open questions before stopping
+- `planRevisionIterations` (number, default: 2) - Number of low-confidence plan revisions before reaching threshold
+- `executionIterations` (number, default: 2) - Number of execution iterations (gap audit cycles)
+- `followUpIterations` (number, default: 2) - Number of follow-up iterations per execution before completing
+- `hardBlockers` (boolean, default: false) - Whether to output hard blockers on the first plan execution
+- `targetConfidence` (number, default: 85) - Confidence threshold to eventually reach (should match --plan-confidence)
+- `startingConfidence` (number, default: 60) - Starting confidence (should be below threshold)
+
+**Example with JSON string:**
+```bash
+tenacious-c "Add user authentication" --mock --mock-config '{"openQuestionIterations": 1, "hardBlockers": true}'
+```
+
+**Example with config file:**
+```bash
+# Create mock-config.json
+cat > mock-config.json << EOF
+{
+  "openQuestionIterations": 1,
+  "planRevisionIterations": 1,
+  "executionIterations": 1,
+  "followUpIterations": 1,
+  "hardBlockers": true,
+  "targetConfidence": 85,
+  "startingConfidence": 60
+}
+EOF
+
+# Use the config file
+tenacious-c "Add user authentication" --mock --mock-config mock-config.json
+```
+
+**Note:** Mock mode is automatically selected when you use `--mock` or `--cli-tool mock`. It generates realistic outputs to enable end-to-end testing of the full workflow without calling real AI tools.
+
 ## How It Works
 
 ### Workflow Overview
@@ -333,7 +387,7 @@ All outputs are stored in `.tenacious-c/<timestamp>/` where `<timestamp>` is an 
 
 ## CLI Tool Selection
 
-Tenacious C supports Codex CLI, GitHub Copilot CLI, Cursor CLI, and Claude Code CLI. The tool automatically detects which tools are available and manages your preference.
+Tenacious C supports Codex CLI, GitHub Copilot CLI, Cursor CLI, Claude Code CLI, and Mock mode (for testing). The tool automatically detects which tools are available and manages your preference.
 
 ### Auto-Detection
 
@@ -344,6 +398,8 @@ On first run (or when no preference is saved):
 - If only Claude is available → uses Claude automatically
 - If multiple are available → prompts you to select one
 
+**Note:** Mock mode is not auto-detected. You must explicitly enable it with `--mock` or `--cli-tool mock`.
+
 Your selection is saved in `.tenacious-c/cli-tool-preference.json` for future runs.
 
 ### Manual Selection
@@ -353,7 +409,10 @@ You can explicitly specify a tool using `--cli-tool`:
 tenacious-c "Add feature" --cli-tool copilot
 tenacious-c "Add feature" --cli-tool cursor
 tenacious-c "Add feature" --cli-tool claude
+tenacious-c "Add feature" --cli-tool mock
 ```
+
+**Note:** Using `--cli-tool mock` is equivalent to using `--mock`. Mock mode simulates the full workflow without calling real AI tools.
 
 This will also save your preference for future runs.
 
@@ -424,6 +483,7 @@ All tools run in "YOLO" mode:
 - **Copilot**: Uses `copilot -p <prompt> --yolo` (enables all permissions for non-interactive execution)
 - **Cursor**: Uses `cursor-agent -p <prompt> --force` (force allows commands without approval)
 - **Claude**: Uses `claude -p <prompt> --dangerously-skip-permissions` (bypasses all permission checks)
+- **Mock**: Generates realistic file outputs without calling real AI tools (for testing)
 
 All tools execute prompts in the background with loading indicators.
 
