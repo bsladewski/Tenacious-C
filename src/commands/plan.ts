@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve, isAbsolute } from 'path';
-import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { getCliToolForAction, executeWithFallback, selectCliTool, selectCliToolForAction } from '../engines';
 import { CliToolType } from '../config';
 import { getPlaceholderTemplate } from '../templates/plan.template';
 import { getAnswerQuestionsTemplate } from '../templates/answer-questions.template';
@@ -21,6 +21,7 @@ import {
   saveExecutionState,
   findLatestResumableRun,
   getExecutionArtifacts,
+  validateExecutionArtifacts,
 } from '../io';
 import { createExecutionState, syncStateWithArtifacts } from '../core';
 import { promptForAnswers, formatAnswers, promptForHardBlockerResolution, formatHardBlockerResolutions, previewPlan } from '../ui';
@@ -87,7 +88,7 @@ export async function executePlanWithFollowUps(
 
     // Get the appropriate CLI tool for execution
     const executeTool = await getCliToolForAction('execute', currentExecuteCliTool, defaultCliTool);
-    const executeToolType = currentExecuteCliTool || defaultCliTool;
+    const executeToolType = await selectCliToolForAction('execute', currentExecuteCliTool, defaultCliTool);
 
     // Execute using AI CLI tool with execute model if specified, with fallback support
     const executeContext: ExecutionContext = {
@@ -112,6 +113,25 @@ export async function executePlanWithFollowUps(
     }
 
     console.log('\n✅ Plan execution complete!');
+    
+    // Validate execution artifacts before proceeding
+    const validationResult = validateExecutionArtifacts(executeOutputDirectory, executionIteration);
+    if (!validationResult.valid) {
+      console.error('\n❌ Artifact validation failed after execution:');
+      if (validationResult.missing.length > 0) {
+        console.error(`   Missing files: ${validationResult.missing.join(', ')}`);
+      }
+      if (validationResult.errors.length > 0) {
+        for (const error of validationResult.errors) {
+          console.error(`   Error: ${error}`);
+        }
+      }
+      console.error('\n   Possible causes:');
+      console.error('   - The CLI tool may have exited before writing artifacts');
+      console.error('   - Check the execution transcripts for errors');
+      console.error('   - Try running with a different CLI tool using --fallback-cli-tools\n');
+      process.exit(1);
+    }
     
     // Log initial execution summary if available
     try {
@@ -556,7 +576,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
 
   // Get the appropriate CLI tool for plan generation
   const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
-  const planToolType = currentPlanCliTool || specifiedCliTool;
+  const planToolType = await selectCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
   
   // Generate initial plan
   console.log('\n📋 Generating initial plan...');
@@ -666,7 +686,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         
         // Get the appropriate CLI tool for plan operations
         const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
-        const planToolType = currentPlanCliTool || specifiedCliTool;
+        const planToolType = await selectCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
         
         console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
         const answerContext: ExecutionContext = {
@@ -718,7 +738,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         
         // Get the appropriate CLI tool for plan operations
         const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
-        const planToolType = currentPlanCliTool || specifiedCliTool;
+        const planToolType = await selectCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
         
         console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, maxRevisions, isDestinyMode)})...`);
         const improveContext: ExecutionContext = {
@@ -905,7 +925,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     
     // Get the appropriate CLI tool for audit
     const auditTool = await getCliToolForAction('audit', currentAuditCliTool, specifiedCliTool);
-    const auditToolType = currentAuditCliTool || specifiedCliTool;
+    const auditToolType = await selectCliToolForAction('audit', currentAuditCliTool, specifiedCliTool);
     
     // Execute using AI CLI tool with audit model if specified, with fallback support
     const auditContext: ExecutionContext = {
@@ -990,7 +1010,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
       
       // Get the appropriate CLI tool for plan operations
       const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
-      const planToolType = currentPlanCliTool || specifiedCliTool;
+      const planToolType = await selectCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
       
       // Execute using AI CLI tool with plan model if specified, with fallback support
       const gapPlanContext: ExecutionContext = {
@@ -1059,7 +1079,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
         
         // Get the appropriate CLI tool for plan operations
         const planTool = await getCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
-        const planToolType = currentPlanCliTool || specifiedCliTool;
+        const planToolType = await selectCliToolForAction('plan', currentPlanCliTool, specifiedCliTool);
         
         const gapPlanContext: ExecutionContext = {
           phase: 'gap-plan',

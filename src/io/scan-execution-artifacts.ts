@@ -1,5 +1,10 @@
-import { readdirSync, existsSync } from 'fs';
+import { readdirSync, existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
+import {
+  parseExecuteMetadata,
+  parsePlanMetadata,
+  parseGapAuditMetadata,
+} from '../schemas/validators';
 
 /**
  * Result of scanning execution artifacts
@@ -103,13 +108,18 @@ export interface GapAuditArtifacts {
   summaryExists: boolean;
 
   /**
-   * Whether gap audit is truly complete (both files exist)
+   * Whether gap audit is truly complete (both files exist and metadata is valid)
    */
   isComplete: boolean;
+
+  /**
+   * List of validation errors (e.g., invalid JSON, schema violations)
+   */
+  errors: string[];
 }
 
 /**
- * Verify gap audit artifacts exist
+ * Verify gap audit artifacts exist and validate JSON structure
  * @param gapAuditOutputDirectory - Directory containing gap audit artifacts
  * @param executionIteration - The execution iteration number
  * @returns GapAuditArtifacts object with verification results
@@ -123,11 +133,30 @@ export function verifyGapAuditArtifacts(
 
   const metadataExists = existsSync(metadataPath);
   const summaryExists = existsSync(summaryPath);
+  const errors: string[] = [];
+
+  // Validate JSON structure if metadata file exists
+  if (metadataExists) {
+    try {
+      const content = readFileSync(metadataPath, 'utf-8');
+      const parseResult = parseGapAuditMetadata(content);
+      if (!parseResult.success) {
+        errors.push(
+          `Invalid gap-audit-metadata.json: ${parseResult.errors?.join(', ') || 'Unknown validation error'}`
+        );
+      }
+    } catch (error) {
+      errors.push(
+        `Failed to read gap-audit-metadata.json: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 
   return {
     metadataExists,
     summaryExists,
-    isComplete: metadataExists && summaryExists,
+    isComplete: metadataExists && summaryExists && errors.length === 0,
+    errors,
   };
 }
 
@@ -144,4 +173,182 @@ export function verifyPlanFile(planPath: string): { exists: boolean; resolvedPat
     exists,
     resolvedPath,
   };
+}
+
+/**
+ * Result of artifact validation
+ */
+export interface ArtifactValidationResult {
+  /**
+   * Whether all required artifacts are valid
+   */
+  valid: boolean;
+
+  /**
+   * List of missing file paths (relative to output directory)
+   */
+  missing: string[];
+
+  /**
+   * List of validation errors (e.g., invalid JSON, schema violations)
+   */
+  errors: string[];
+}
+
+/**
+ * Validate execution artifacts after CLI tool execution
+ * Checks for both summary markdown and metadata JSON, and validates JSON structure
+ * 
+ * @param executeOutputDirectory - Directory containing execution artifacts
+ * @param executionIteration - The execution iteration number (e.g., 1, 2, 3)
+ * @returns ArtifactValidationResult with validation status and any issues
+ */
+export function validateExecutionArtifacts(
+  executeOutputDirectory: string,
+  executionIteration: number
+): ArtifactValidationResult {
+  const result: ArtifactValidationResult = {
+    valid: true,
+    missing: [],
+    errors: [],
+  };
+
+  // Check for execution summary markdown
+  const summaryFilename = `execution-summary-${executionIteration}.md`;
+  const summaryPath = resolve(executeOutputDirectory, summaryFilename);
+  if (!existsSync(summaryPath)) {
+    result.valid = false;
+    result.missing.push(summaryFilename);
+  }
+
+  // Check for execute-metadata.json
+  const metadataFilename = 'execute-metadata.json';
+  const metadataPath = resolve(executeOutputDirectory, metadataFilename);
+  if (!existsSync(metadataPath)) {
+    result.valid = false;
+    result.missing.push(metadataFilename);
+  } else {
+    // Validate JSON structure
+    try {
+      const content = readFileSync(metadataPath, 'utf-8');
+      const parseResult = parseExecuteMetadata(content);
+      if (!parseResult.success) {
+        result.valid = false;
+        result.errors.push(
+          `Invalid ${metadataFilename}: ${parseResult.errors?.join(', ') || 'Unknown validation error'}`
+        );
+      }
+    } catch (error) {
+      result.valid = false;
+      result.errors.push(
+        `Failed to read ${metadataFilename}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Validate plan artifacts after CLI tool execution
+ * Checks for both plan markdown and metadata JSON, and validates JSON structure
+ * 
+ * @param planOutputDirectory - Directory containing plan artifacts
+ * @returns ArtifactValidationResult with validation status and any issues
+ */
+export function validatePlanArtifacts(planOutputDirectory: string): ArtifactValidationResult {
+  const result: ArtifactValidationResult = {
+    valid: true,
+    missing: [],
+    errors: [],
+  };
+
+  // Check for plan.md
+  const planFilename = 'plan.md';
+  const planPath = resolve(planOutputDirectory, planFilename);
+  if (!existsSync(planPath)) {
+    result.valid = false;
+    result.missing.push(planFilename);
+  }
+
+  // Check for plan-metadata.json
+  const metadataFilename = 'plan-metadata.json';
+  const metadataPath = resolve(planOutputDirectory, metadataFilename);
+  if (!existsSync(metadataPath)) {
+    result.valid = false;
+    result.missing.push(metadataFilename);
+  } else {
+    // Validate JSON structure
+    try {
+      const content = readFileSync(metadataPath, 'utf-8');
+      const parseResult = parsePlanMetadata(content);
+      if (!parseResult.success) {
+        result.valid = false;
+        result.errors.push(
+          `Invalid ${metadataFilename}: ${parseResult.errors?.join(', ') || 'Unknown validation error'}`
+        );
+      }
+    } catch (error) {
+      result.valid = false;
+      result.errors.push(
+        `Failed to read ${metadataFilename}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Validate gap audit artifacts after CLI tool execution
+ * Enhanced version that validates JSON structure in addition to file existence
+ * 
+ * @param gapAuditOutputDirectory - Directory containing gap audit artifacts
+ * @param executionIteration - The execution iteration number
+ * @returns ArtifactValidationResult with validation status and any issues
+ */
+export function validateGapAuditArtifacts(
+  gapAuditOutputDirectory: string,
+  executionIteration: number
+): ArtifactValidationResult {
+  const result: ArtifactValidationResult = {
+    valid: true,
+    missing: [],
+    errors: [],
+  };
+
+  // Check for gap-audit-summary-{executionIteration}.md
+  const summaryFilename = `gap-audit-summary-${executionIteration}.md`;
+  const summaryPath = resolve(gapAuditOutputDirectory, summaryFilename);
+  if (!existsSync(summaryPath)) {
+    result.valid = false;
+    result.missing.push(summaryFilename);
+  }
+
+  // Check for gap-audit-metadata.json
+  const metadataFilename = 'gap-audit-metadata.json';
+  const metadataPath = resolve(gapAuditOutputDirectory, metadataFilename);
+  if (!existsSync(metadataPath)) {
+    result.valid = false;
+    result.missing.push(metadataFilename);
+  } else {
+    // Validate JSON structure
+    try {
+      const content = readFileSync(metadataPath, 'utf-8');
+      const parseResult = parseGapAuditMetadata(content);
+      if (!parseResult.success) {
+        result.valid = false;
+        result.errors.push(
+          `Invalid ${metadataFilename}: ${parseResult.errors?.join(', ') || 'Unknown validation error'}`
+        );
+      }
+    } catch (error) {
+      result.valid = false;
+      result.errors.push(
+        `Failed to read ${metadataFilename}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  return result;
 }

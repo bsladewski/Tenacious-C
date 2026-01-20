@@ -33,13 +33,17 @@ export { readExecuteMetadata } from './read-execute-metadata';
 export { readGapAuditMetadata } from './read-gap-audit-metadata';
 export { clearOpenQuestions } from './update-metadata';
 
-// Artifact scanning
+// Artifact scanning and validation
 export {
   ExecutionArtifacts,
   GapAuditArtifacts,
+  ArtifactValidationResult,
   getExecutionArtifacts,
   verifyGapAuditArtifacts,
   verifyPlanFile,
+  validateExecutionArtifacts,
+  validatePlanArtifacts,
+  validateGapAuditArtifacts,
 } from './scan-execution-artifacts';
 
 // Other IO utilities

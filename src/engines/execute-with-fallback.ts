@@ -11,6 +11,12 @@ import { createCodexAdapter } from './codex-adapter';
 import { createCopilotAdapter } from './copilot-adapter';
 import { createMockAdapter } from './mock-adapter';
 import { createRealProcessRunner } from './real-process-runner';
+import { getDefaultSpinnerService } from '../ui';
+import {
+  validateExecutionArtifacts,
+  validatePlanArtifacts,
+  validateGapAuditArtifacts,
+} from '../io';
 
 /**
  * Result of executing with fallback
@@ -224,6 +230,72 @@ export function contextToEngineOptions(
 }
 
 /**
+ * Get a display name for a tool type
+ */
+function getToolDisplayName(toolType: CliToolType): string {
+  switch (toolType) {
+    case 'cursor':
+      return 'Cursor';
+    case 'claude':
+      return 'Claude';
+    case 'codex':
+      return 'Codex';
+    case 'copilot':
+      return 'Copilot';
+    case 'mock':
+      return 'Mock';
+    default:
+      return toolType;
+  }
+}
+
+/**
+ * Validate artifacts based on the execution phase
+ * Returns null if validation is not applicable for the phase
+ */
+function validateArtifactsForPhase(
+  context: ExecutionContext
+): { valid: boolean; missing: string[]; errors: string[] } | null {
+  const { phase, outputDirectory, executionIteration } = context;
+
+  if (!outputDirectory) {
+    return null;
+  }
+
+  switch (phase) {
+    case 'execute-plan':
+    case 'execute-follow-ups':
+      if (executionIteration === undefined) {
+        return null;
+      }
+      return validateExecutionArtifacts(outputDirectory, executionIteration);
+
+    case 'plan-generation':
+    case 'improve-plan':
+    case 'answer-questions':
+      return validatePlanArtifacts(outputDirectory);
+
+    case 'gap-audit':
+      if (executionIteration === undefined) {
+        return null;
+      }
+      return validateGapAuditArtifacts(outputDirectory, executionIteration);
+
+    case 'gap-plan':
+      // Gap plan uses the same plan validation but with a different filename pattern
+      // For now, skip validation as the filename varies (gap-plan-{iteration}.md)
+      return null;
+
+    case 'generate-summary':
+      // Summary generation doesn't produce artifacts we need to validate
+      return null;
+
+    default:
+      return null;
+  }
+}
+
+/**
  * Execute a prompt using engine adapters with fallback support
  *
  * This is the new implementation that uses EngineAdapter interface internally.
@@ -244,14 +316,33 @@ export async function executeWithEngineAdapter(
   context?: ExecutionContext
 ): Promise<ExecuteWithFallbackResult> {
   const options = contextToEngineOptions(prompt, model, context);
+  const spinnerService = getDefaultSpinnerService();
 
   // Try primary adapter first
   const primaryAdapter = getEngineAdapter(toolType);
+  const primaryToolName = getToolDisplayName(toolType);
+  const primarySpinner = spinnerService.start(`Executing ${primaryToolName}`);
 
   try {
     const result = await primaryAdapter.execute(options);
 
     if (isEngineSuccess(result)) {
+      // Validate artifacts after successful execution based on phase
+      if (context?.phase && context?.outputDirectory) {
+        const validationResult = validateArtifactsForPhase(context);
+        if (validationResult && !validationResult.valid) {
+          primarySpinner.fail(`${primaryToolName} execution completed but artifacts are missing or invalid`);
+          const missingMsg = validationResult.missing.length > 0
+            ? `Missing files: [${validationResult.missing.join(', ')}]`
+            : '';
+          const errorMsg = validationResult.errors.length > 0
+            ? `Validation errors: [${validationResult.errors.join(', ')}]`
+            : '';
+          throw new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+        }
+      }
+      
+      primarySpinner.succeed(`Executed ${primaryToolName}`);
       return {
         success: true,
         usedTool: toolType,
@@ -262,8 +353,10 @@ export async function executeWithEngineAdapter(
     }
 
     // Non-zero exit code - treat as failure
+    primarySpinner.fail(`${primaryToolName} execution failed`);
     throw new Error(`${toolType} execution failed with exit code ${result.exitCode}`);
   } catch (primaryError) {
+    primarySpinner.fail(`${primaryToolName} execution failed`);
     console.log(`\n⚠️  Primary engine adapter failed: ${primaryError instanceof Error ? primaryError.message : String(primaryError)}`);
 
     // Try fallback adapters in order
@@ -282,11 +375,29 @@ export async function executeWithEngineAdapter(
 
       const fallbackAdapter = getEngineAdapter(fallbackToolType);
       const fallbackOptions = contextToEngineOptions(prompt, null, context); // Clear model
+      const fallbackToolName = getToolDisplayName(fallbackToolType);
+      const fallbackSpinner = spinnerService.start(`Executing ${fallbackToolName}`);
 
       try {
         const result = await fallbackAdapter.execute(fallbackOptions);
 
         if (isEngineSuccess(result)) {
+          // Validate artifacts after successful fallback execution based on phase
+          if (context?.phase && context?.outputDirectory) {
+            const validationResult = validateArtifactsForPhase(context);
+            if (validationResult && !validationResult.valid) {
+              fallbackSpinner.fail(`${fallbackToolName} execution completed but artifacts are missing or invalid`);
+              const missingMsg = validationResult.missing.length > 0
+                ? `Missing files: [${validationResult.missing.join(', ')}]`
+                : '';
+              const errorMsg = validationResult.errors.length > 0
+                ? `Validation errors: [${validationResult.errors.join(', ')}]`
+                : '';
+              throw new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+            }
+          }
+          
+          fallbackSpinner.succeed(`Executed ${fallbackToolName}`);
           return {
             success: true,
             usedTool: fallbackToolType,
@@ -296,8 +407,10 @@ export async function executeWithEngineAdapter(
           };
         }
 
+        fallbackSpinner.fail(`${fallbackToolName} execution failed`);
         throw new Error(`${fallbackToolType} execution failed with exit code ${result.exitCode}`);
       } catch (fallbackError) {
+        fallbackSpinner.fail(`${fallbackToolName} execution failed`);
         console.log(`\n⚠️  Fallback engine adapter ${fallbackToolType} also failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
         // Continue to next fallback
       }

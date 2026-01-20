@@ -127,6 +127,22 @@ If parsing fails, you MUST fix the file and re-run the validation until it succe
 
 ---
 
+## FINAL VERIFICATION CHECKLIST
+
+**CRITICAL:** Before completing your response, you MUST verify ALL of the following:
+
+- [ ] Created \`{{outputDirectory}}/plan.md\` with the plan content
+- [ ] Created \`{{outputDirectory}}/plan-metadata.json\` with ONLY the allowed keys (confidence, openQuestions, summary)
+- [ ] Ran the JSON validation command and it succeeded (output shows "plan-metadata.json parses")
+- [ ] Both files are in the correct location (\`{{outputDirectory}}\`) with the correct filenames
+- [ ] Every open question has at least 2 suggested answers in the \`suggestedAnswers\` array
+
+**WARNING:** If any of these checks fail, you MUST fix them before completing your response.
+
+**NOTE:** The calling system will automatically verify these files exist after execution completes. If the files are missing or malformed, the execution will be treated as a failure and may trigger retries or fallback to a different tool.
+
+---
+
 ## Required Plan File Structure
 
 Every plan file MUST follow this top-level structure:

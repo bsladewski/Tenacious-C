@@ -32,10 +32,12 @@ import {
   readQAHistory,
   readExecuteMetadata,
   readGapAuditMetadata,
+  validateExecutionArtifacts,
+  validatePlanArtifacts,
 } from '../io';
 import { promptForAnswers, formatAnswers, promptForHardBlockerResolution, formatHardBlockerResolutions, previewPlan } from '../ui';
 import { generateFinalSummary } from '../logging';
-import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { getCliToolForAction, executeWithFallback, selectCliTool, selectCliToolForAction } from '../engines';
 import inquirer from 'inquirer';
 
 /**
@@ -259,7 +261,7 @@ async function handlePlanGeneration(ctx: OrchestratorPlanContext): Promise<void>
 
   // Get CLI tool
   const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
-  const planToolType = ctx.currentPlanCliTool || ctx.specifiedCliTool;
+  const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
   // Execute with fallback
   const context: ExecutionContext = {
@@ -280,6 +282,25 @@ async function handlePlanGeneration(ctx: OrchestratorPlanContext): Promise<void>
     ctx.currentPlanCliTool = result.usedTool;
     ctx.currentPlanModel = result.usedModel;
     ctx.currentFallbackTools = result.remainingFallbackTools;
+  }
+
+  // Validate plan artifacts before proceeding
+  const validationResult = validatePlanArtifacts(planOutputDirectory);
+  if (!validationResult.valid) {
+    console.error('\n❌ Artifact validation failed after plan generation:');
+    if (validationResult.missing.length > 0) {
+      console.error(`   Missing files: ${validationResult.missing.join(', ')}`);
+    }
+    if (validationResult.errors.length > 0) {
+      for (const error of validationResult.errors) {
+        console.error(`   Error: ${error}`);
+      }
+    }
+    console.error('\n   Possible causes:');
+    console.error('   - The CLI tool may have exited before writing artifacts');
+    console.error('   - Check the execution transcripts for errors');
+    console.error('   - Try running with a different CLI tool using --fallback-cli-tools\n');
+    process.exit(1);
   }
 
   // Transition to revision phase
@@ -355,7 +376,7 @@ async function handlePlanRevision(
       });
 
       const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
-      const planToolType = ctx.currentPlanCliTool || ctx.specifiedCliTool;
+      const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
       console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, config.limits.maxPlanIterations, isDestinyMode)})...`);
 
@@ -396,7 +417,7 @@ async function handlePlanRevision(
       });
 
       const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
-      const planToolType = ctx.currentPlanCliTool || ctx.specifiedCliTool;
+      const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
       console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, config.limits.maxPlanIterations, isDestinyMode)})...`);
 
@@ -482,7 +503,7 @@ async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
   });
 
   const executeTool = await getCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
-  const executeToolType = ctx.currentExecuteCliTool || ctx.specifiedCliTool;
+  const executeToolType = await selectCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
 
   const executeContext: ExecutionContext = {
     phase: 'execute-plan',
@@ -505,6 +526,25 @@ async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
   }
 
   console.log('\n✅ Plan execution complete!');
+
+  // Validate execution artifacts before proceeding
+  const validationResult = validateExecutionArtifacts(executeOutputDirectory, execIterationCount);
+  if (!validationResult.valid) {
+    console.error('\n❌ Artifact validation failed after execution:');
+    if (validationResult.missing.length > 0) {
+      console.error(`   Missing files: ${validationResult.missing.join(', ')}`);
+    }
+    if (validationResult.errors.length > 0) {
+      for (const error of validationResult.errors) {
+        console.error(`   Error: ${error}`);
+      }
+    }
+    console.error('\n   Possible causes:');
+    console.error('   - The CLI tool may have exited before writing artifacts');
+    console.error('   - Check the execution transcripts for errors');
+    console.error('   - Try running with a different CLI tool using --fallback-cli-tools\n');
+    process.exit(1);
+  }
 
   // Check execution metadata
   try {
@@ -575,7 +615,7 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
       });
 
       const executeTool = await getCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
-      const executeToolType = ctx.currentExecuteCliTool || ctx.specifiedCliTool;
+      const executeToolType = await selectCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
 
       const followUpContext: ExecutionContext = {
         phase: 'execute-follow-ups',
@@ -640,7 +680,7 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
     });
 
     const executeTool = await getCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
-    const executeToolType = ctx.currentExecuteCliTool || ctx.specifiedCliTool;
+    const executeToolType = await selectCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
 
     const followUpContext: ExecutionContext = {
       phase: 'execute-follow-ups',
@@ -703,7 +743,7 @@ async function handleGapAudit(ctx: OrchestratorPlanContext): Promise<void> {
   });
 
   const auditTool = await getCliToolForAction('audit', ctx.currentAuditCliTool, ctx.specifiedCliTool);
-  const auditToolType = ctx.currentAuditCliTool || ctx.specifiedCliTool;
+  const auditToolType = await selectCliToolForAction('audit', ctx.currentAuditCliTool, ctx.specifiedCliTool);
 
   const auditContext: ExecutionContext = {
     phase: 'gap-audit',
@@ -798,7 +838,7 @@ async function handleGapPlan(ctx: OrchestratorPlanContext): Promise<void> {
   });
 
   const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
-  const planToolType = ctx.currentPlanCliTool || ctx.specifiedCliTool;
+  const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
   const gapPlanContext: ExecutionContext = {
     phase: 'gap-plan',

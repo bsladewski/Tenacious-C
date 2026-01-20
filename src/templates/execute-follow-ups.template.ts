@@ -239,7 +239,23 @@ After writing \`execute-metadata.json\`, you MUST run this validation command:
 \`\`\`bash
 node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/execute-metadata.json','utf8')); console.log('execute-metadata.json parses')"
 \`\`\`
-If parsing fails, you MUST fix the file and re-run the validation until it succeeds.`,
+If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
+
+---
+
+## FINAL VERIFICATION CHECKLIST
+
+**CRITICAL:** Before completing your response, you MUST verify ALL of the following:
+
+- [ ] Created \`{{outputDirectory}}/execution-summary-{{executionIteration}}-followup-{{followUpIteration}}.md\` with the execution summary
+- [ ] Created/updated \`{{outputDirectory}}/execute-metadata.json\` with ONLY the allowed keys (hasFollowUps, hardBlockers, summary)
+- [ ] Ran the JSON validation command and it succeeded (output shows "execute-metadata.json parses")
+- [ ] Both files are in the correct location (\`{{outputDirectory}}\`) with the correct filenames
+- [ ] The \`hasFollowUps\` boolean correctly reflects whether there are remaining follow-ups (\`false\` if all done, \`true\` if any remain)
+
+**WARNING:** If any of these checks fail, you MUST fix them before completing your response.
+
+**NOTE:** The calling system will automatically verify these files exist after execution completes. If the files are missing or malformed, the execution will be treated as a failure and may trigger retries or fallback to a different tool.`,
     description: 'Template for executing follow-up items from a previous execution',
     requiredVariables: ['executionSummaryPath', 'outputDirectory', 'executionIteration', 'followUpIteration'],
   };

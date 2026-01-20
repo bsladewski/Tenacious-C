@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { getCliToolForAction, executeWithFallback, selectCliTool } from '../engines';
+import { getCliToolForAction, executeWithFallback, selectCliTool, selectCliToolForAction } from '../engines';
 import { CliToolType } from '../config';
 import {
   loadExecutionState,
@@ -206,7 +206,7 @@ async function resumePlanGeneration(
     
     // Get the appropriate CLI tool for plan operations
     const planTool = await getCliToolForAction('plan', currentPlanCliTool, defaultCliTool);
-    const planToolType = currentPlanCliTool || defaultCliTool;
+    const planToolType = await selectCliToolForAction('plan', currentPlanCliTool, defaultCliTool);
     
     // Execute using AI CLI tool with plan model if specified, with fallback support
     const planContext: ExecutionContext = {
@@ -604,7 +604,7 @@ async function resumeExecution(
       
       // Get the appropriate CLI tool for audit
       const auditTool = await getCliToolForAction('audit', currentAuditCliTool, defaultCliTool);
-      const auditToolType = currentAuditCliTool || defaultCliTool;
+      const auditToolType = await selectCliToolForAction('audit', currentAuditCliTool, defaultCliTool);
       
       const auditContext: ExecutionContext = {
         phase: 'gap-audit',
@@ -874,7 +874,7 @@ async function resumeExecution(
       
       // Get the appropriate CLI tool for audit
       const auditTool = await getCliToolForAction('audit', currentAuditCliTool, defaultCliTool);
-      const auditToolType = currentAuditCliTool || defaultCliTool;
+      const auditToolType = await selectCliToolForAction('audit', currentAuditCliTool, defaultCliTool);
       
       const auditContext: ExecutionContext = {
         phase: 'gap-audit',
@@ -1002,6 +1002,7 @@ async function resumeExecution(
     }
     
     // Update state for next iteration
+    const nextIterationCount = execIterationCount + 1;
     const gapPlanState: ExecutionState = {
       ...auditState,
       phase: 'execution' as const,
@@ -1010,7 +1011,7 @@ async function resumeExecution(
         gapPlanOutputDirectory,
       },
       execution: {
-        execIterationCount,
+        execIterationCount: nextIterationCount,
         currentPlanPath,
         executeOutputDirectory: '', // Will be set in next iteration
         followUpIterationCount: 0,
@@ -1018,6 +1019,10 @@ async function resumeExecution(
       },
     };
     saveExecutionState(timestampDirectory, gapPlanState);
+    state = gapPlanState;
+    
+    // Increment iteration count for next loop iteration
+    execIterationCount = nextIterationCount;
   }
 }
 

@@ -185,7 +185,23 @@ After writing \`gap-audit-metadata.json\`, you MUST run this validation command:
 \`\`\`bash
 node -e "JSON.parse(require('fs').readFileSync('{{outputDirectory}}/gap-audit-metadata.json','utf8')); console.log('gap-audit-metadata.json parses')"
 \`\`\`
-If parsing fails, you MUST fix the file and re-run the validation until it succeeds.`,
+If parsing fails, you MUST fix the file and re-run the validation until it succeeds.
+
+---
+
+## FINAL VERIFICATION CHECKLIST
+
+**CRITICAL:** Before completing your response, you MUST verify ALL of the following:
+
+- [ ] Created \`{{outputDirectory}}/gap-audit-summary-{{executionIteration}}.md\` with the gap audit summary
+- [ ] Created \`{{outputDirectory}}/gap-audit-metadata.json\` with ONLY the allowed keys (gapsIdentified, summary)
+- [ ] Ran the JSON validation command and it succeeded (output shows "gap-audit-metadata.json parses")
+- [ ] Both files are in the correct location (\`{{outputDirectory}}\`) with the correct filenames
+- [ ] The \`gapsIdentified\` boolean correctly reflects whether any gaps were found
+
+**WARNING:** If any of these checks fail, you MUST fix them before completing your response.
+
+**NOTE:** The calling system will automatically verify these files exist after execution completes. If the files are missing or malformed, the execution will be treated as a failure and may trigger retries or fallback to a different tool.`,
     description: 'Template for auditing implementation completeness and quality',
     requiredVariables: ['requirementsPath', 'planPath', 'outputDirectory', 'executionIteration'],
   };
