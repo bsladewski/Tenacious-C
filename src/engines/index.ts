@@ -11,7 +11,6 @@ export {
   createMockProcessRunner,
   createSuccessfulMockRunner,
   createFailingMockRunner,
-  createTimeoutMockRunner,
 } from './mock-process-runner';
 
 // Engine adapter interface and base class

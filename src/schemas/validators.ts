@@ -195,10 +195,6 @@ const effectiveConfigSchema = z.object({
     maxRetries: z.number().nonnegative(),
     retryDelayMs: z.number().nonnegative(),
   }),
-  timeouts: z.object({
-    engineTimeoutMs: z.number().positive(),
-    engineTimeouts: z.record(cliToolNameSchema, z.number().positive()).optional(),
-  }),
   paths: z.object({
     workingDirectory: z.string(),
     artifactBaseDir: z.string(),

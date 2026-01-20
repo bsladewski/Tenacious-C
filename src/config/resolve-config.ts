@@ -72,7 +72,6 @@ export interface RepoConfig {
   maxFollowUpIterations?: number;
   maxExecIterations?: number;
   planConfidence?: number;
-  engineTimeoutMs?: number;
 }
 
 /**
@@ -91,7 +90,6 @@ export interface UserConfig {
   maxFollowUpIterations?: number;
   maxExecIterations?: number;
   planConfidence?: number;
-  engineTimeoutMs?: number;
 }
 
 /**
@@ -317,17 +315,6 @@ export function resolveConfig(
       ),
       maxRetries: DEFAULT_CONFIG.fallback.maxRetries,
       retryDelayMs: DEFAULT_CONFIG.fallback.retryDelayMs,
-    },
-
-    timeouts: {
-      engineTimeoutMs: resolveValue(
-        'engineTimeoutMs',
-        undefined,
-        undefined,
-        repoConfig?.engineTimeoutMs,
-        userConfig?.engineTimeoutMs,
-        DEFAULT_CONFIG.timeouts.engineTimeoutMs
-      ),
     },
 
     paths: {

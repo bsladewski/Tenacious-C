@@ -21,8 +21,6 @@ export interface MockProcessResponse {
   stdout?: string;
   /** Stderr content */
   stderr?: string;
-  /** Whether to simulate timeout */
-  timedOut?: boolean;
   /** Signal if killed */
   signal?: string;
 }
@@ -92,7 +90,6 @@ export class TestProcessRunner implements ProcessRunner {
       stderr: response.stderr ?? '',
       stdoutTail: response.stdout?.split('\n').slice(-100) ?? [],
       stderrTail: response.stderr?.split('\n').slice(-100) ?? [],
-      timedOut: response.timedOut ?? false,
       signal: response.signal,
       startedAt: new Date(now.getTime() - 100).toISOString(),
       endedAt: now.toISOString(),

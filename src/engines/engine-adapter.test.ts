@@ -13,7 +13,6 @@ import {
   createMockProcessRunner,
   createSuccessfulMockRunner,
   createFailingMockRunner,
-  createTimeoutMockRunner,
 } from './mock-process-runner';
 import { EngineExecutionOptions } from '../types/engine-result';
 import { SpawnOptions } from '../types/process-runner';
@@ -76,7 +75,6 @@ describe('Engine Adapters', () => {
       expect(result).toHaveProperty('durationMs');
       expect(result).toHaveProperty('stdoutTail');
       expect(result).toHaveProperty('stderrTail');
-      expect(result).toHaveProperty('timedOut', false);
       expect(result).toHaveProperty('interrupted', false);
       expect(result).toHaveProperty('invocation');
       expect(result.invocation.command).toBe('cursor-agent');
@@ -231,17 +229,6 @@ describe('Engine Adapters', () => {
       expect(result.stderrTail).toContain('Error message');
     });
 
-    it('should handle timeout', async () => {
-      processRunner = createTimeoutMockRunner();
-      adapter = createCursorAdapter({
-        processRunner,
-        defaultRetries: 0,
-      });
-
-      const result = await adapter.execute(createTestExecutionOptions());
-      expect(result.timedOut).toBe(true);
-    });
-
     it('should throw on spawn failure', async () => {
       processRunner = createMockProcessRunner({ throwError: new Error('Spawn failed') });
       adapter = createCursorAdapter({
@@ -272,7 +259,6 @@ describe('Engine Adapters', () => {
             durationMs: 100,
             stdoutTail: [],
             stderrTail: ['First attempt failed'],
-            timedOut: false,
             interrupted: false,
           };
         }
@@ -282,7 +268,6 @@ describe('Engine Adapters', () => {
           durationMs: 100,
           stdoutTail: ['Success'],
           stderrTail: [],
-          timedOut: false,
           interrupted: false,
         };
       };

@@ -106,7 +106,6 @@ function createMockProcessRunner(): ProcessRunner {
     durationMs: 1000,
     stdoutTail: ['Output line 1', 'Output line 2'],
     stderrTail: [],
-    timedOut: false,
     interrupted: false,
   };
 

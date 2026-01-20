@@ -21,8 +21,6 @@ export interface EngineInvocationRecord {
   exitCode: number;
   /** Duration in milliseconds */
   durationMs: number;
-  /** Whether the invocation timed out */
-  timedOut: boolean;
   /** Whether the invocation was interrupted */
   interrupted: boolean;
   /** Start time (ISO 8601) */
@@ -106,7 +104,6 @@ export class RunSummaryBuilder {
       model: result.modelUsed,
       exitCode: result.exitCode,
       durationMs: result.durationMs,
-      timedOut: result.timedOut ?? false,
       interrupted: result.interrupted ?? false,
       startedAt: result.invocation?.startedAt ?? this.startedAt,
       endedAt: result.invocation?.endedAt ?? new Date().toISOString(),
@@ -212,7 +209,7 @@ export function formatRunSummaryMarkdown(summary: RunSummary): string {
     lines.push('|-------|--------|----------|-----------|--------|');
 
     for (const inv of summary.engineInvocations) {
-      const status = inv.timedOut ? 'Timeout' : inv.interrupted ? 'Interrupted' : inv.exitCode === 0 ? 'Success' : 'Failed';
+      const status = inv.interrupted ? 'Interrupted' : inv.exitCode === 0 ? 'Success' : 'Failed';
       lines.push(`| ${inv.phase} | ${inv.engine} | ${formatDuration(inv.durationMs)} | ${inv.exitCode} | ${status} |`);
     }
   }

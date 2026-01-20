@@ -16,8 +16,6 @@ export interface EngineAdapterOptions {
   executablePath?: string;
   /** Default working directory */
   workingDirectory?: string;
-  /** Default timeout in milliseconds */
-  defaultTimeoutMs?: number;
   /** Default number of retries */
   defaultRetries?: number;
   /** Retry delay in milliseconds */
@@ -60,7 +58,6 @@ export abstract class BaseEngineAdapter implements EngineAdapter {
   protected readonly processRunner: ProcessRunner;
   protected readonly executablePath: string;
   protected readonly workingDirectory: string;
-  protected readonly defaultTimeoutMs: number;
   protected readonly defaultRetries: number;
   protected readonly retryDelayMs: number;
 
@@ -68,7 +65,6 @@ export abstract class BaseEngineAdapter implements EngineAdapter {
     this.processRunner = options.processRunner;
     this.executablePath = options.executablePath ?? this.getDefaultExecutablePath();
     this.workingDirectory = options.workingDirectory ?? process.cwd();
-    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 300000; // 5 minutes
     this.defaultRetries = options.defaultRetries ?? 2;
     this.retryDelayMs = options.retryDelayMs ?? 10000; // 10 seconds
   }
@@ -141,7 +137,6 @@ export abstract class BaseEngineAdapter implements EngineAdapter {
       args,
       cwd: options.cwd ?? this.workingDirectory,
       env: options.env,
-      timeoutMs: options.timeoutMs ?? this.defaultTimeoutMs,
       transcriptDir: options.transcriptDir,
       transcriptPrefix: this.getTranscriptPrefix(options),
       captureTranscripts: !!options.transcriptDir,
@@ -157,7 +152,6 @@ export abstract class BaseEngineAdapter implements EngineAdapter {
       stderrTranscriptPath: spawnResult.stderrTranscriptPath,
       stdoutTail: spawnResult.stdoutTail,
       stderrTail: spawnResult.stderrTail,
-      timedOut: spawnResult.timedOut,
       interrupted: spawnResult.interrupted,
       signal: spawnResult.signal,
       modelUsed: options.model,
@@ -176,7 +170,6 @@ export abstract class BaseEngineAdapter implements EngineAdapter {
       const result = await this.processRunner.spawn(this.executablePath, {
         args: ['--version'],
         cwd: this.workingDirectory,
-        timeoutMs: 5000,
       });
       return result.exitCode === 0;
     } catch {
@@ -189,7 +182,6 @@ export abstract class BaseEngineAdapter implements EngineAdapter {
       const result = await this.processRunner.spawn(this.executablePath, {
         args: ['--version'],
         cwd: this.workingDirectory,
-        timeoutMs: 5000,
       });
       if (result.exitCode === 0 && result.stdoutTail.length > 0) {
         return result.stdoutTail[0].trim();

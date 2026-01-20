@@ -205,7 +205,6 @@ Return a standardized shape:
 ### 8.3 Subprocess safety
 - Prefer `spawn(command, args, { shell: false })` to avoid shell injection.
 - Never interpolate untrusted strings into shell commands.
-- Timeouts should be configurable.
 - Handle SIGINT/SIGTERM: terminate child processes and flush artifacts.
 
 ### 8.4 Output UX policy
@@ -302,8 +301,7 @@ Provide a way to package relevant artifacts and logs for troubleshooting:
 - cap transcript sizes or rotate logs (configurable)
 - avoid holding huge strings in memory; stream to file
 
-### 12.2 Timeouts and retry policy
-- allow per-engine timeouts
+### 12.2 Retry policy
 - retry only on well-defined transient failures
 - record retries in logs/artifacts
 

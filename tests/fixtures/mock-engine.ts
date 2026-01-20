@@ -59,14 +59,6 @@ export const PRESET_RESPONSES = {
     durationMs: 100,
     stderrTail: ['Engine execution failed'],
   } satisfies MockAdapterResponse,
-
-  /** Engine timeout */
-  ENGINE_TIMEOUT: {
-    exitCode: 124,
-    durationMs: 100,
-    timedOut: true,
-    stderrTail: ['Engine timed out'],
-  } satisfies MockAdapterResponse,
 };
 
 /**

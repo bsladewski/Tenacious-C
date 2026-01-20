@@ -41,7 +41,6 @@ export class CodexAdapter extends BaseEngineAdapter {
       const result = await this.processRunner.spawn(this.executablePath, {
         args: ['--help'],
         cwd: this.workingDirectory,
-        timeoutMs: 5000,
       });
       // Codex returns 0 for --help
       return result.exitCode === 0;

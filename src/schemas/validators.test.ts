@@ -293,9 +293,6 @@ describe('validateEffectiveConfig', () => {
       maxRetries: 3,
       retryDelayMs: 1000,
     },
-    timeouts: {
-      engineTimeoutMs: 300000,
-    },
     paths: {
       workingDirectory: '/test',
       artifactBaseDir: '/test/.tenacious-c',

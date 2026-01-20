@@ -17,8 +17,6 @@ export interface MockProcessConfig {
   stdoutLines?: string[];
   /** Stderr lines to return */
   stderrLines?: string[];
-  /** Whether to simulate timeout */
-  timedOut?: boolean;
   /** Whether to simulate interruption */
   interrupted?: boolean;
   /** Signal that caused interruption */
@@ -43,7 +41,6 @@ export class MockProcessRunner implements ProcessRunner {
       durationMs: 100,
       stdoutLines: [],
       stderrLines: [],
-      timedOut: false,
       interrupted: false,
       simulatedDelayMs: 0,
       ...defaultConfig,
@@ -138,7 +135,6 @@ export class MockProcessRunner implements ProcessRunner {
       durationMs: config.durationMs ?? 100,
       stdoutTail: config.stdoutLines ?? [],
       stderrTail: config.stderrLines ?? [],
-      timedOut: config.timedOut ?? false,
       interrupted: config.interrupted ?? false,
       signal: config.signal,
     };
@@ -185,13 +181,3 @@ export function createFailingMockRunner(
   });
 }
 
-/**
- * Create a mock process runner that simulates timeout
- */
-export function createTimeoutMockRunner(): MockProcessRunner {
-  return new MockProcessRunner({
-    exitCode: 124,
-    durationMs: 30000,
-    timedOut: true,
-  });
-}

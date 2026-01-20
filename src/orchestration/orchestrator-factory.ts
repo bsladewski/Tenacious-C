@@ -172,7 +172,6 @@ export function legacyOptionsToEffectiveConfig(options: LegacyConfigOptions): Ef
       maxRetries: DEFAULT_CONFIG.fallback.maxRetries,
       retryDelayMs: DEFAULT_CONFIG.fallback.retryDelayMs,
     },
-    timeouts: { ...DEFAULT_CONFIG.timeouts },
     paths: {
       workingDirectory: options.workingDirectory ?? process.cwd(),
       artifactBaseDir: options.artifactBaseDir ?? resolve(options.workingDirectory ?? process.cwd(), '.tenacious-c'),
@@ -328,7 +327,6 @@ export function createTestConfig(overrides: Partial<EffectiveConfig> = {}): Effe
     interactivity: overrides.interactivity ?? { ...DEFAULT_CONFIG.interactivity },
     runMode: overrides.runMode ?? { ...DEFAULT_CONFIG.runMode },
     fallback: overrides.fallback ?? { ...DEFAULT_CONFIG.fallback },
-    timeouts: overrides.timeouts ?? { ...DEFAULT_CONFIG.timeouts },
     paths: overrides.paths ?? {
       workingDirectory: '/test',
       artifactBaseDir: '/test/.tenacious-c',

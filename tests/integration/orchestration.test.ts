@@ -58,9 +58,6 @@ function createTestConfig(overrides: Partial<EffectiveConfig> = {}): EffectiveCo
       maxRetries: 3,
       retryDelayMs: 100,
     },
-    timeouts: {
-      engineTimeoutMs: 10000,
-    },
     paths: {
       workingDirectory: '/test',
       artifactBaseDir: '/test/.tenacious-c',

@@ -15,8 +15,6 @@ export interface SpawnOptions {
   cwd: string;
   /** Environment variables (merged with process.env) */
   env?: Record<string, string>;
-  /** Timeout in milliseconds (0 = no timeout) */
-  timeoutMs?: number;
   /** Directory to write stdout/stderr transcripts */
   transcriptDir?: string;
   /** Prefix for transcript file names */
@@ -47,8 +45,6 @@ export interface SpawnResult {
   stdoutTranscriptPath?: string;
   /** Path to stderr transcript file (if captured) */
   stderrTranscriptPath?: string;
-  /** Whether the process was killed due to timeout */
-  timedOut: boolean;
   /** Whether the process was interrupted by signal */
   interrupted: boolean;
   /** Signal that terminated the process, if any */
@@ -93,7 +89,6 @@ export function spawnResultToEngineResult(
     stderrTranscriptPath: spawnResult.stderrTranscriptPath,
     stdoutTail: spawnResult.stdoutTail,
     stderrTail: spawnResult.stderrTail,
-    timedOut: spawnResult.timedOut,
     interrupted: spawnResult.interrupted,
     signal: spawnResult.signal,
     modelUsed,

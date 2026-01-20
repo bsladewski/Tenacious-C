@@ -101,16 +101,6 @@ export interface FallbackConfig {
 }
 
 /**
- * Timeout configuration
- */
-export interface TimeoutConfig {
-  /** Default engine timeout in milliseconds */
-  engineTimeoutMs: number;
-  /** Per-engine timeout overrides */
-  engineTimeouts?: Partial<Record<CliToolName, number>>;
-}
-
-/**
  * Path configuration
  */
 export interface PathConfig {
@@ -161,9 +151,6 @@ export interface EffectiveConfig {
 
   /** Fallback configuration */
   fallback: FallbackConfig;
-
-  /** Timeout configuration */
-  timeouts: TimeoutConfig;
 
   /** Path configuration */
   paths: PathConfig;
@@ -217,9 +204,6 @@ export const DEFAULT_CONFIG: Omit<EffectiveConfig, 'input' | 'runId' | 'resolved
     maxRetries: 3,
     retryDelayMs: 1000,
   },
-  timeouts: {
-    engineTimeoutMs: 300000, // 5 minutes
-  },
 };
 
 /**
@@ -227,13 +211,6 @@ export const DEFAULT_CONFIG: Omit<EffectiveConfig, 'input' | 'runId' | 'resolved
  */
 export function isUnlimitedIterations(config: EffectiveConfig): boolean {
   return config.runMode.unlimitedIterations;
-}
-
-/**
- * Get the effective timeout for a specific engine
- */
-export function getEngineTimeout(config: EffectiveConfig, engine: CliToolName): number {
-  return config.timeouts.engineTimeouts?.[engine] ?? config.timeouts.engineTimeoutMs;
 }
 
 /**

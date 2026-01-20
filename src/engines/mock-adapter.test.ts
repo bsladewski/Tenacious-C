@@ -181,7 +181,7 @@ Follow instruction precedence (highest to lowest):
 
   describe('execute-follow-ups phase', () => {
     it('should generate follow-up execution summary', async () => {
-      const options = createExecutionOptions('Execute the follow-up items from the previous execution.', { mode: 'execute' });
+      const options = createExecutionOptions('You are executing follow-up items from a previous execution run.', { mode: 'execute' });
       await adapter.execute(options);
 
       expect(existsSync(resolve(testDir, 'execution-summary-1-followup-0.md'))).toBe(true);
@@ -190,12 +190,12 @@ Follow instruction precedence (highest to lowest):
 
     it('should track follow-up iterations', async () => {
       // First follow-up
-      await adapter.execute(createExecutionOptions('Execute the follow-up items from the previous execution.', { mode: 'execute' }));
+      await adapter.execute(createExecutionOptions('You are executing follow-up items from a previous execution run.', { mode: 'execute' }));
       let metadata = JSON.parse(readFileSync(resolve(testDir, 'execute-metadata.json'), 'utf-8'));
       expect(metadata.hasFollowUps).toBe(true);
 
       // Second follow-up (default config has 2 follow-up iterations)
-      await adapter.execute(createExecutionOptions('Execute the follow-up items from the previous execution.', { mode: 'execute' }));
+      await adapter.execute(createExecutionOptions('You are executing follow-up items from a previous execution run.', { mode: 'execute' }));
       metadata = JSON.parse(readFileSync(resolve(testDir, 'execute-metadata.json'), 'utf-8'));
       expect(metadata.hasFollowUps).toBe(false); // Should be false after reaching limit
     });

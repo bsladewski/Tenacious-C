@@ -44,8 +44,6 @@ export interface EngineResult {
   invocation: InvocationMetadata;
   /** Model used for execution, if discoverable */
   modelUsed?: string;
-  /** Whether the engine was terminated due to timeout */
-  timedOut?: boolean;
   /** Whether the engine was interrupted by signal */
   interrupted?: boolean;
   /** Signal that caused interruption, if any */
@@ -68,8 +66,6 @@ export interface EngineExecutionOptions {
   env?: Record<string, string>;
   /** Model to use (optional, engine-specific) */
   model?: string;
-  /** Timeout in milliseconds */
-  timeoutMs?: number;
   /** Directory to write transcripts to */
   transcriptDir?: string;
 }
@@ -78,14 +74,7 @@ export interface EngineExecutionOptions {
  * Check if an engine result represents success
  */
 export function isEngineSuccess(result: EngineResult): boolean {
-  return result.exitCode === 0 && !result.timedOut && !result.interrupted;
-}
-
-/**
- * Check if an engine result indicates a timeout
- */
-export function isEngineTimeout(result: EngineResult): boolean {
-  return result.timedOut === true;
+  return result.exitCode === 0 && !result.interrupted;
 }
 
 /**
@@ -99,9 +88,6 @@ export function isEngineInterrupted(result: EngineResult): boolean {
  * Get a brief summary of the engine result for logging
  */
 export function getEngineResultSummary(result: EngineResult): string {
-  if (result.timedOut) {
-    return `Timed out after ${result.durationMs}ms`;
-  }
   if (result.interrupted) {
     return `Interrupted by ${result.signal ?? 'unknown signal'}`;
   }

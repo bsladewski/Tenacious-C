@@ -54,8 +54,6 @@ export interface MockAdapterResponse {
   stdoutTail?: string[];
   /** Stderr lines to return */
   stderrTail?: string[];
-  /** Whether to simulate timeout */
-  timedOut?: boolean;
   /** Whether to simulate interruption */
   interrupted?: boolean;
   /** Signal if interrupted */
@@ -142,7 +140,6 @@ export class MockAdapter implements EngineAdapter {
       durationMs: response.durationMs,
       stdoutTail: response.stdoutTail,
       stderrTail: response.stderrTail,
-      timedOut: response.timedOut,
       interrupted: response.interrupted,
       signal: response.signal,
       modelUsed: options.model ?? 'mock-model',

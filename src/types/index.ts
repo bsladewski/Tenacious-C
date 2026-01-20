@@ -34,7 +34,6 @@ export {
   EngineExecutionOptions,
   InvocationMetadata,
   isEngineSuccess,
-  isEngineTimeout,
   isEngineInterrupted,
   getEngineResultSummary,
 } from './engine-result';
@@ -110,12 +109,10 @@ export {
   InteractivityConfig,
   RunModeConfig,
   FallbackConfig,
-  TimeoutConfig,
   PathConfig,
   ConfigSource,
   DEFAULT_CONFIG,
   isUnlimitedIterations,
-  getEngineTimeout,
   redactConfigForLogging,
 } from './effective-config';
 

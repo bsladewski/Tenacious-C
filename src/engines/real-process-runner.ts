@@ -93,24 +93,8 @@ export class RealProcessRunner implements ProcessRunner {
       this.runningProcesses.set(processId, child);
 
       // Result state
-      let timedOut = false;
       let interrupted = false;
       let signal: string | undefined;
-
-      // Set up timeout
-      let timeoutHandle: NodeJS.Timeout | undefined;
-      if (options.timeoutMs && options.timeoutMs > 0) {
-        timeoutHandle = setTimeout(() => {
-          timedOut = true;
-          child.kill('SIGTERM');
-          // Force kill after 5 seconds if still running
-          setTimeout(() => {
-            if (!child.killed) {
-              child.kill('SIGKILL');
-            }
-          }, 5000);
-        }, options.timeoutMs);
-      }
 
       // Handle stdout
       if (child.stdout) {
@@ -142,11 +126,6 @@ export class RealProcessRunner implements ProcessRunner {
 
       // Handle process completion
       child.on('close', (code, sig) => {
-        // Clear timeout
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-
         // Remove from running processes
         this.runningProcesses.delete(processId);
 
@@ -167,13 +146,12 @@ export class RealProcessRunner implements ProcessRunner {
         const durationMs = Date.now() - startTime;
 
         resolve({
-          exitCode: code ?? (timedOut ? 124 : interrupted ? 130 : 1),
+          exitCode: code ?? (interrupted ? 130 : 1),
           durationMs,
           stdoutTail: stdoutTail.getLines(),
           stderrTail: stderrTail.getLines(),
           stdoutTranscriptPath,
           stderrTranscriptPath,
-          timedOut,
           interrupted,
           signal,
         });
@@ -181,11 +159,6 @@ export class RealProcessRunner implements ProcessRunner {
 
       // Handle spawn errors
       child.on('error', (error) => {
-        // Clear timeout
-        if (timeoutHandle) {
-          clearTimeout(timeoutHandle);
-        }
-
         // Remove from running processes
         this.runningProcesses.delete(processId);
 

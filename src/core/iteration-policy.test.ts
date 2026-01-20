@@ -38,7 +38,6 @@ function createTestConfig(overrides: Partial<EffectiveConfig> = {}): EffectiveCo
       ...(overrides.runMode || {}),
     },
     fallback: DEFAULT_CONFIG.fallback,
-    timeouts: DEFAULT_CONFIG.timeouts,
     paths: {
       workingDirectory: '/test',
       artifactBaseDir: '/test/.tenacious-c',
