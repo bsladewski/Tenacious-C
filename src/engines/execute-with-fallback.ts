@@ -318,43 +318,77 @@ export async function executeWithEngineAdapter(
   const options = contextToEngineOptions(prompt, model, context);
   const spinnerService = getDefaultSpinnerService();
 
-  // Try primary adapter first
+  // Try primary adapter first with retry logic for artifact validation
   const primaryAdapter = getEngineAdapter(toolType);
   const primaryToolName = getToolDisplayName(toolType);
   const primarySpinner = spinnerService.start(`Executing ${primaryToolName}`);
 
   try {
-    const result = await primaryAdapter.execute(options);
+    // Retry loop for artifact validation (same as adapter retries: 2 retries = 3 total attempts)
+    const maxRetries = 2;
+    const retryDelayMs = 10000; // 10 seconds, matching adapter retry delay
+    let lastError: Error | undefined;
 
-    if (isEngineSuccess(result)) {
-      // Validate artifacts after successful execution based on phase
-      if (context?.phase && context?.outputDirectory) {
-        const validationResult = validateArtifactsForPhase(context);
-        if (validationResult && !validationResult.valid) {
-          primarySpinner.fail(`${primaryToolName} execution completed but artifacts are missing or invalid`);
-          const missingMsg = validationResult.missing.length > 0
-            ? `Missing files: [${validationResult.missing.join(', ')}]`
-            : '';
-          const errorMsg = validationResult.errors.length > 0
-            ? `Validation errors: [${validationResult.errors.join(', ')}]`
-            : '';
-          throw new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await primaryAdapter.execute(options);
+
+        if (isEngineSuccess(result)) {
+          // Validate artifacts after successful execution based on phase
+          if (context?.phase && context?.outputDirectory) {
+            const validationResult = validateArtifactsForPhase(context);
+            if (validationResult && !validationResult.valid) {
+              // Artifacts missing - treat as retryable failure
+              const missingMsg = validationResult.missing.length > 0
+                ? `Missing files: [${validationResult.missing.join(', ')}]`
+                : '';
+              const errorMsg = validationResult.errors.length > 0
+                ? `Validation errors: [${validationResult.errors.join(', ')}]`
+                : '';
+
+              if (attempt < maxRetries) {
+                // Retry the execution
+                primarySpinner.setText(`${primaryToolName} execution completed but artifacts are missing or invalid (retry ${attempt + 1}/${maxRetries + 1})...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                lastError = new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+                continue; // Retry
+              } else {
+                // All retries exhausted
+                primarySpinner.fail(`${primaryToolName} execution completed but artifacts are missing or invalid after ${maxRetries + 1} attempts`);
+                throw new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+              }
+            }
+          }
+
+          // Success - artifacts are valid
+          primarySpinner.succeed(`Executed ${primaryToolName}`);
+          return {
+            success: true,
+            usedTool: toolType,
+            fallbackOccurred: false,
+            usedModel: model ?? null,
+            remainingFallbackTools: fallbackTools,
+          };
         }
+
+        // Non-zero exit code - treat as failure (adapter already retried, so this is final)
+        primarySpinner.fail(`${primaryToolName} execution failed`);
+        throw new Error(`${toolType} execution failed with exit code ${result.exitCode}`);
+      } catch (error) {
+        // If this is an artifact validation error and we have retries left, continue the loop
+        if (error instanceof Error && error.message.includes('Artifact validation failed') && attempt < maxRetries) {
+          lastError = error;
+          continue;
+        }
+        // Otherwise, rethrow to trigger fallback
+        throw error;
       }
-      
-      primarySpinner.succeed(`Executed ${primaryToolName}`);
-      return {
-        success: true,
-        usedTool: toolType,
-        fallbackOccurred: false,
-        usedModel: model ?? null,
-        remainingFallbackTools: fallbackTools,
-      };
     }
 
-    // Non-zero exit code - treat as failure
-    primarySpinner.fail(`${primaryToolName} execution failed`);
-    throw new Error(`${toolType} execution failed with exit code ${result.exitCode}`);
+    // If we exhausted retries, throw the last error
+    if (lastError) {
+      throw lastError;
+    }
   } catch (primaryError) {
     primarySpinner.fail(`${primaryToolName} execution failed`);
     console.log(`\n⚠️  Primary engine adapter failed: ${primaryError instanceof Error ? primaryError.message : String(primaryError)}`);
@@ -379,36 +413,71 @@ export async function executeWithEngineAdapter(
       const fallbackSpinner = spinnerService.start(`Executing ${fallbackToolName}`);
 
       try {
-        const result = await fallbackAdapter.execute(fallbackOptions);
+        // Same retry logic for fallback tools
+        const maxRetries = 2;
+        const retryDelayMs = 10000; // 10 seconds, matching adapter retry delay
+        let lastFallbackError: Error | undefined;
 
-        if (isEngineSuccess(result)) {
-          // Validate artifacts after successful fallback execution based on phase
-          if (context?.phase && context?.outputDirectory) {
-            const validationResult = validateArtifactsForPhase(context);
-            if (validationResult && !validationResult.valid) {
-              fallbackSpinner.fail(`${fallbackToolName} execution completed but artifacts are missing or invalid`);
-              const missingMsg = validationResult.missing.length > 0
-                ? `Missing files: [${validationResult.missing.join(', ')}]`
-                : '';
-              const errorMsg = validationResult.errors.length > 0
-                ? `Validation errors: [${validationResult.errors.join(', ')}]`
-                : '';
-              throw new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const result = await fallbackAdapter.execute(fallbackOptions);
+
+            if (isEngineSuccess(result)) {
+              // Validate artifacts after successful fallback execution based on phase
+              if (context?.phase && context?.outputDirectory) {
+                const validationResult = validateArtifactsForPhase(context);
+                if (validationResult && !validationResult.valid) {
+                  // Artifacts missing - treat as retryable failure
+                  const missingMsg = validationResult.missing.length > 0
+                    ? `Missing files: [${validationResult.missing.join(', ')}]`
+                    : '';
+                  const errorMsg = validationResult.errors.length > 0
+                    ? `Validation errors: [${validationResult.errors.join(', ')}]`
+                    : '';
+
+                  if (attempt < maxRetries) {
+                    // Retry the execution
+                    fallbackSpinner.setText(`${fallbackToolName} execution completed but artifacts are missing or invalid (retry ${attempt + 1}/${maxRetries + 1})...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                    lastFallbackError = new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+                    continue; // Retry
+                  } else {
+                    // All retries exhausted
+                    fallbackSpinner.fail(`${fallbackToolName} execution completed but artifacts are missing or invalid after ${maxRetries + 1} attempts`);
+                    throw new Error(`Artifact validation failed: ${[missingMsg, errorMsg].filter(Boolean).join('. ')}`);
+                  }
+                }
+              }
+
+              // Success - artifacts are valid
+              fallbackSpinner.succeed(`Executed ${fallbackToolName}`);
+              return {
+                success: true,
+                usedTool: fallbackToolType,
+                fallbackOccurred: true,
+                usedModel: null, // Model cleared on fallback
+                remainingFallbackTools: remainingFallbacks,
+              };
             }
+
+            // Non-zero exit code - treat as failure (adapter already retried, so this is final)
+            fallbackSpinner.fail(`${fallbackToolName} execution failed`);
+            throw new Error(`${fallbackToolType} execution failed with exit code ${result.exitCode}`);
+          } catch (error) {
+            // If this is an artifact validation error and we have retries left, continue the loop
+            if (error instanceof Error && error.message.includes('Artifact validation failed') && attempt < maxRetries) {
+              lastFallbackError = error;
+              continue;
+            }
+            // Otherwise, rethrow to trigger next fallback
+            throw error;
           }
-          
-          fallbackSpinner.succeed(`Executed ${fallbackToolName}`);
-          return {
-            success: true,
-            usedTool: fallbackToolType,
-            fallbackOccurred: true,
-            usedModel: null, // Model cleared on fallback
-            remainingFallbackTools: remainingFallbacks,
-          };
         }
 
-        fallbackSpinner.fail(`${fallbackToolName} execution failed`);
-        throw new Error(`${fallbackToolType} execution failed with exit code ${result.exitCode}`);
+        // If we exhausted retries, throw the last error
+        if (lastFallbackError) {
+          throw lastFallbackError;
+        }
       } catch (fallbackError) {
         fallbackSpinner.fail(`${fallbackToolName} execution failed`);
         console.log(`\n⚠️  Fallback engine adapter ${fallbackToolType} also failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
@@ -419,6 +488,9 @@ export async function executeWithEngineAdapter(
     // All fallbacks exhausted
     throw new Error(`All engine adapters failed. Primary error: ${primaryError instanceof Error ? primaryError.message : String(primaryError)}`);
   }
+
+  // This should never be reached, but TypeScript requires it
+  throw new Error('Unexpected execution path');
 }
 
 /**
