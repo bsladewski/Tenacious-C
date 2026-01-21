@@ -2,12 +2,48 @@ import { PromptTemplate } from './prompt-template';
 import { getGapAuditMetadataSchemaString } from '../schemas/gap-audit-metadata.schema';
 
 /**
+ * Nemesis mode sub-prompt for more adversarial gap audits
+ * This prompt is inserted into the gap audit template when nemesis mode is enabled
+ */
+const NEMESIS_PROMPT = `You are auditing an implementation produced by an **external system** with **unknown incentives** and **minimal domain knowledge**. Assume the implementer may have:
+- optimized for "passing" rather than correctness,
+- cut corners, skipped edge cases, or introduced subtle regressions,
+- misunderstood repository conventions, requirements, or contracts.
+
+### Strict failure rule
+This audit is considered **failed** if any defect, missing behavior, or incorrect behavior is later found that **should reasonably have been detected by this gap analysis**.
+
+Therefore, you must behave as a **high-skepticism adversarial reviewer**:
+- Actively search for missing requirements coverage, incorrect behavior, and hidden regressions.
+- Treat ambiguous areas as high-risk and attempt to disambiguate by reading repository docs, contracts, tests, and code.
+- Prefer identifying *probable* failure points over giving the benefit of the doubt.
+
+### Required audit depth
+To avoid missing defects:
+1) Trace each requirement to concrete implementation evidence (routes, handlers, functions, UI flows, etc.).
+2) Identify edge cases and negative paths (null/empty, invalid inputs, boundary conditions, permission/authorization, failure handling).
+3) Verify integration points and contracts (API shapes, schema assumptions, DB/pipeline semantics, side effects).
+4) Verify consistency with repository standards (linting, formatting, AGENTS rules, documented conventions).
+5) Evaluate correctness beyond "it compiles": look for logical bugs, race conditions, brittle assumptions, and incomplete wiring.
+
+### Output requirements in Nemesis Mode
+In addition to your normal outputs, you MUST include:
+- A **Risk Register**: the top 5–15 most likely defect vectors, each with:
+  - why it's risky,
+  - where in code it might manifest,
+  - how to validate it (tests to add, checks to run, scenarios to try).
+- A **Defect Hypothesis List**: concrete "this might be broken" hypotheses with pointers to relevant code.
+- **No rubber-stamps**: If you cannot confirm a requirement is met from evidence, mark it as \`partial\` or \`unmet\` and describe what is missing.
+
+You must still remain accurate and evidence-based: do not invent defects. If you suspect a defect but cannot confirm it, label it as a *risk/hypothesis* and propose validation steps.`;
+
+/**
  * Gap audit template for verifying implementation completeness and quality
  * This template is used to audit the codebase against requirements and plan
  * 
  * Based on the Cursor audit command structure
  */
-export function getGapAuditTemplate(): PromptTemplate {
+export function getGapAuditTemplate(nemesisMode: boolean = false): PromptTemplate {
   const metadataSchema = getGapAuditMetadataSchemaString();
   
   return {
@@ -22,7 +58,7 @@ Follow instruction precedence (highest to lowest):
 1. This command's rules  
 2. Agent rules (e.g., \`cursorrules/\`, \`agents.md\`, etc.)  
 3. The original requirements and plan
-
+${nemesisMode ? `\n---\n\n${NEMESIS_PROMPT}\n\n---\n` : ''}
 **CRITICAL READ-ONLY RULE:**
 You MUST NOT modify any files besides the audit report and metadata JSON in \`{{outputDirectory}}\`.
 You MUST NOT create TODO lists in the codebase.
@@ -60,7 +96,7 @@ Perform a deep, accuracy-first audit to verify:
    - Conforms to all agent rules (cursorrules/, agents.md, etc.)
    - Aligns with repository documentation
    - Maintains architecture/layering conventions
-   - Follows security, structured errors, and i18n/a11y/routing conventions where applicable
+   - Follows workspace-specific conventions (e.g., security, structured errors, i18n/a11y/routing) where applicable
 
 3. **Implementation Quality:**
    - Code is well-structured and maintainable

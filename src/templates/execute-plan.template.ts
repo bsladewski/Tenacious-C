@@ -89,7 +89,7 @@ As you work:
 - Make small, safe, scoped changes
 - After each meaningful change, run appropriate lint and focused tests for the affected area (use repo-standard commands)
 - Update/add tests to maintain coverage standards and prevent regressions
-- Maintain architecture/layering, security, structured errors, and i18n/a11y/routing conventions per repo rules where applicable
+- Maintain workspace-specific conventions (e.g., architecture/layering, security, structured errors, i18n/a11y/routing) per repo rules where applicable
 
 **CRITICAL ENVIRONMENT SAFETY RULES:**
 - **NEVER modify live environments** (production, staging, or any deployed environment)

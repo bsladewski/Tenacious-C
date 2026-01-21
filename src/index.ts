@@ -139,7 +139,8 @@ async function main() {
         args.noInteractive,
         args.verbose,
         args.debug,
-        args.jsonOutput
+        args.jsonOutput,
+        args.nemesis
       );
     } else {
       // Use the legacy execution path
@@ -164,7 +165,8 @@ async function main() {
         args.noInteractive,
         args.verbose,
         args.debug,
-        args.jsonOutput
+        args.jsonOutput,
+        args.nemesis
       );
     }
   } catch (error) {

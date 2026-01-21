@@ -136,7 +136,9 @@ export async function resumePlan(state: ExecutionState): Promise<void> {
       state = syncedState;
     }
     
-    await resumeExecution(state, config.cliTool, maxFollowUpIterations, execIterations, isDestinyMode, config.executeModel, config.auditModel, config.planModel, config.planCliTool, config.executeCliTool, config.auditCliTool, config.fallbackCliTools || []);
+    // Extract nemesis flag from config if available (for backward compatibility, default to false)
+    const nemesis = (config as ExecutionState['config'] & { nemesis?: boolean }).nemesis ?? false;
+    await resumeExecution(state, config.cliTool, maxFollowUpIterations, execIterations, isDestinyMode, config.executeModel, config.auditModel, config.planModel, config.planCliTool, config.executeCliTool, config.auditCliTool, config.fallbackCliTools || [], nemesis);
   }
   
   // Mark as complete and generate final summary
@@ -439,7 +441,8 @@ async function resumeExecution(
   planCliTool: CliToolType | null,
   executeCliTool: CliToolType | null,
   auditCliTool: CliToolType | null,
-  fallbackCliTools: CliToolType[] = []
+  fallbackCliTools: CliToolType[] = [],
+  nemesis: boolean = false
 ): Promise<void> {
   const { timestampDirectory } = state;
   
@@ -594,7 +597,7 @@ async function resumeExecution(
       console.log('\n🔍 Running gap audit...');
       mkdirSync(gapAuditOutputDirectory, { recursive: true });
       
-      const gapAuditTemplate = getGapAuditTemplate();
+      const gapAuditTemplate = getGapAuditTemplate(nemesis);
       const gapAuditPrompt = interpolateTemplate(gapAuditTemplate, {
         requirementsPath,
         planPath: currentPlanPath,
@@ -864,7 +867,7 @@ async function resumeExecution(
       console.log('\n🔍 Running gap audit...');
       mkdirSync(gapAuditOutputDirectory, { recursive: true });
       
-      const gapAuditTemplate = getGapAuditTemplate();
+      const gapAuditTemplate = getGapAuditTemplate(nemesis);
       const gapAuditPrompt = interpolateTemplate(gapAuditTemplate, {
         requirementsPath,
         planPath: currentPlanPath,

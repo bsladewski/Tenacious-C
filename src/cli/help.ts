@@ -24,6 +24,7 @@ Options:
   --preview-plan                      Preview the initial plan before execution
   --resume                            Resume the most recent interrupted run
   --the-prompt-of-destiny             Override all iteration limits - continue until truly done
+  --nemesis                           Enable nemesis mode for more adversarial gap audits
   --mock                              Use mock CLI tool for testing (no AI costs)
   --mock-config <json|file>           Mock tool configuration (JSON string or file path)
   --experimental-orchestrator         Use experimental Orchestrator-based execution

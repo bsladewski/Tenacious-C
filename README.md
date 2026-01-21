@@ -8,6 +8,7 @@ An intelligent, iterative AI-powered development tool that generates comprehensi
 - **Iterative Refinement**: Automatically refines plans through question-answering and confidence-based improvements
 - **Plan Execution**: Executes plans with automatic follow-up iterations to handle blockers
 - **Gap Analysis**: Performs gap audits and generates gap closure plans when execution reveals missing requirements
+- **Nemesis Mode**: Optional adversarial gap audit mode for maximum thoroughness in defect detection
 - **Multi-Tool Support**: Works with the Codex CLI, GitHub Copilot CLI, Cursor CLI, and Claude Code CLI
 - **Smart Tool Selection**: Auto-detects available tools and remembers your preference
 - **The Prompt of Destiny**: Override all limits to continue until truly done
@@ -257,6 +258,25 @@ Override all iteration limits. When enabled, the tool will continue iterating un
 ```bash
 tenacious-c "Add user authentication" --the-prompt-of-destiny
 ```
+
+#### `--nemesis`
+
+Enable nemesis mode for more adversarial gap audits. When enabled, gap audits use a more skeptical, adversarial approach that:
+
+- Assumes the implementation may have been optimized for "passing" rather than correctness
+- Actively searches for missing requirements coverage, incorrect behavior, and hidden regressions
+- Treats ambiguous areas as high-risk and attempts to disambiguate by reading repository docs, contracts, tests, and code
+- Requires deeper audit depth with concrete implementation evidence, edge case identification, and integration point verification
+- Produces additional outputs including a Risk Register and Defect Hypothesis List
+
+This mode is useful when you want to ensure maximum thoroughness in gap detection, especially when auditing implementations from external systems or when you need to catch subtle defects that might be missed in a standard audit.
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --nemesis
+```
+
+**Note:** Nemesis mode only affects gap audits. Planning and execution phases are not affected.
 
 #### `--mock`
 

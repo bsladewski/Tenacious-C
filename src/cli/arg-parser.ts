@@ -276,6 +276,11 @@ export function parseArgs(argv: string[]): ParseResult {
         break;
       }
 
+      case '--nemesis': {
+        result.nemesis = true;
+        break;
+      }
+
       default: {
         // Check for unknown flags
         if (arg.startsWith('--')) {

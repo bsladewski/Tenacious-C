@@ -462,7 +462,7 @@ export async function executePlanWithFollowUps(
  * @param executeCliTool - Optional CLI tool to use for execution/follow-ups (overrides specifiedCliTool)
  * @param auditCliTool - Optional CLI tool to use for gap audits (overrides specifiedCliTool)
  */
-export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null, fallbackCliTools: CliToolType[] = [], _noInteractive: boolean = false, _verbose: boolean = false, _debug: boolean = false, _jsonOutput: boolean = false): Promise<void> {
+export async function executePlan(input: string, maxRevisions: number = 10, planConfidenceThreshold: number = 85, maxFollowUpIterations: number = 10, execIterations: number = 5, isDestinyMode: boolean = false, specifiedCliTool: CliToolType | null = null, previewPlanFlag: boolean = false, resumeFlag: boolean = false, planModel: string | null = null, executeModel: string | null = null, auditModel: string | null = null, planCliTool: CliToolType | null = null, executeCliTool: CliToolType | null = null, auditCliTool: CliToolType | null = null, fallbackCliTools: CliToolType[] = [], _noInteractive: boolean = false, _verbose: boolean = false, _debug: boolean = false, _jsonOutput: boolean = false, nemesis: boolean = false): Promise<void> {
   // If resume flag is set, find and resume the latest run
   if (resumeFlag) {
     const tenaciousCDir = resolve(process.cwd(), '.tenacious-c');
@@ -915,7 +915,7 @@ export async function executePlan(input: string, maxRevisions: number = 10, plan
     mkdirSync(gapAuditOutputDirectory, { recursive: true });
     
     // Get the gap audit template and interpolate
-    const gapAuditTemplate = getGapAuditTemplate();
+    const gapAuditTemplate = getGapAuditTemplate(nemesis);
     const gapAuditPrompt = interpolateTemplate(gapAuditTemplate, {
       requirementsPath,
       planPath: currentPlanPath,

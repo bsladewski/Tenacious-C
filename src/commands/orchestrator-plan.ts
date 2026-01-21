@@ -71,6 +71,8 @@ interface OrchestratorPlanContext {
   // Mutable directories set during execution
   currentExecuteOutputDirectory?: string;
   currentGapAuditOutputDirectory?: string;
+  // Nemesis mode flag
+  nemesis: boolean;
 }
 
 /**
@@ -96,7 +98,8 @@ export async function executePlanWithOrchestrator(
   noInteractive: boolean = false,
   verbose: boolean = false,
   debug: boolean = false,
-  jsonOutput: boolean = false
+  jsonOutput: boolean = false,
+  nemesis: boolean = false
 ): Promise<void> {
   console.log('\n🧪 Running with experimental Orchestrator...\n');
 
@@ -164,6 +167,7 @@ export async function executePlanWithOrchestrator(
     currentAuditModel: auditModel,
     currentFallbackTools: [...fallbackCliTools],
     specifiedCliTool,
+    nemesis,
   };
 
   // Start orchestration
@@ -734,7 +738,7 @@ async function handleGapAudit(ctx: OrchestratorPlanContext): Promise<void> {
 
   await ctx.deps.fileSystem.mkdir(gapAuditOutputDirectory, true);
 
-  const gapAuditTemplate = getGapAuditTemplate();
+  const gapAuditTemplate = getGapAuditTemplate(ctx.nemesis);
   const gapAuditPrompt = interpolateTemplate(gapAuditTemplate, {
     requirementsPath: ctx.requirementsPath,
     planPath: ctx.currentPlanPath,

@@ -83,6 +83,9 @@ export interface ParsedArgs {
 
   /** Output machine-readable JSON summary */
   jsonOutput: boolean;
+
+  /** Enable nemesis mode for more adversarial gap audits */
+  nemesis: boolean;
 }
 
 /** Default values for parsed arguments */
@@ -112,6 +115,7 @@ export const DEFAULT_ARGS: ParsedArgs = {
   verbose: false,
   debug: false,
   jsonOutput: false,
+  nemesis: false,
 };
 
 /** Result of parsing arguments */
