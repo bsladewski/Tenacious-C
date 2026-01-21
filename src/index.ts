@@ -137,7 +137,8 @@ async function main() {
       args.verbose,
       args.debug,
       args.jsonOutput,
-      args.nemesis
+      args.nemesis,
+      args.planOnly
     );
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));

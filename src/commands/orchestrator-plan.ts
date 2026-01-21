@@ -123,10 +123,9 @@ export async function executePlanWithOrchestrator(
   verbose: boolean = false,
   debug: boolean = false,
   jsonOutput: boolean = false,
-  nemesis: boolean = false
+  nemesis: boolean = false,
+  planOnly: boolean = false
 ): Promise<void> {
-  console.log('\n🚀 Starting execution...\n');
-
   // Convert input to requirements
   let requirements: string;
   if (existsSync(input)) {
@@ -154,6 +153,7 @@ export async function executePlanWithOrchestrator(
     executeCliTool,
     auditCliTool,
     fallbackCliTools,
+    planOnly,
   };
 
   // Create orchestrator with production dependencies
@@ -255,8 +255,8 @@ export async function executePlanWithOrchestrator(
     if (!startResult.success) {
       throw new Error(`Failed to start orchestration: ${startResult.description}`);
     }
-
-    console.log(`📋 ${orchestrator.getStateDescription()}`);
+    // Don't print state description here - handlers will print their own messages
+    // (removes duplicate "Generating initial plan" before handler's "Generating initial plan...")
   }
 
   // Run the orchestration loop
@@ -272,6 +272,22 @@ export async function executePlanWithOrchestrator(
     } catch (error) {
       console.warn(`\n⚠️  Could not generate final summary: ${error instanceof Error ? error.message : String(error)}`);
       console.log(`\n📁 Artifacts are available in: ${timestampDirectory}\n`);
+    }
+
+    // In plan-only mode, copy the final plan to the working directory
+    if (config.runMode.planOnly) {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const destPath = resolve(process.cwd(), `plan_${timestamp}.md`);
+      try {
+        const copyResult = await deps.fileSystem.copy(currentPlanPath, destPath);
+        if (copyResult.ok) {
+          console.log(`\n📄 Plan copied to: ${destPath}`);
+        } else {
+          console.warn(`\n⚠️  Could not copy plan file: ${copyResult.error.message}`);
+        }
+      } catch (error) {
+        console.warn(`\n⚠️  Could not copy plan file: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 }
@@ -564,7 +580,15 @@ async function handlePlanRevision(
       console.log('───────────────────────────────────────────────────────────────');
     }
 
-    orchestrator.onPlanComplete(metadata.confidence);
+    // If plan-only mode, skip execution and go directly to summary generation
+    // Important: Check BEFORE onPlanComplete() to avoid transitioning to EXECUTION first
+    if (config.runMode.planOnly) {
+      console.log('\n📋 Plan-only mode: skipping execution phase');
+      orchestrator.onGenerateSummary();
+    } else {
+      orchestrator.onPlanComplete(metadata.confidence);
+    }
+
     persistState(ctx);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
@@ -583,6 +607,16 @@ async function handlePlanRevision(
  */
 async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
   const { orchestrator, config, timestampDirectory } = ctx;
+
+  // Defense in depth: should not reach execution in plan-only mode
+  // This is a safety guard in case the primary check in handlePlanRevision() is bypassed
+  if (config.runMode.planOnly) {
+    console.log('\n⚠️  Warning: Reached execution phase in plan-only mode. Skipping.');
+    orchestrator.onGenerateSummary();
+    persistState(ctx);
+    return;
+  }
+
   const execIterationCount = orchestrator.getContext().execIterationCount;
   const isDestinyMode = config.runMode.unlimitedIterations;
   const isInitialExecution = execIterationCount === 1;

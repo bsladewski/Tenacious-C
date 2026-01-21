@@ -86,6 +86,8 @@ export interface RunModeConfig {
   unlimitedIterations: boolean;
   /** Whether using mock engine for testing */
   mockMode: boolean;
+  /** Whether to skip execution and stop after plan is complete */
+  planOnly: boolean;
 }
 
 /**
@@ -198,6 +200,7 @@ export const DEFAULT_CONFIG: Omit<EffectiveConfig, 'input' | 'runId' | 'resolved
     resume: false,
     unlimitedIterations: false,
     mockMode: false,
+    planOnly: false,
   },
   fallback: {
     fallbackTools: [],

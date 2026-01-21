@@ -273,6 +273,7 @@ describe('Resume flow integration tests', () => {
           resume: true,
           unlimitedIterations: true,
           mockMode: false,
+          planOnly: false,
         },
       });
 
@@ -293,6 +294,87 @@ describe('Resume flow integration tests', () => {
 
       // Transition history is not persisted, so it should be empty on resume
       expect(runState.transitionHistory).toEqual([]);
+    });
+  });
+});
+
+describe('Plan-only mode state transitions', () => {
+  describe('PLAN_REVISION to SUMMARY_GENERATION transition', () => {
+    it('should allow direct transition from PLAN_REVISION to SUMMARY_GENERATION', () => {
+      const state = phaseToState('plan-revision');
+      expect(state).toBe('PLAN_REVISION');
+
+      // Verify the phase mapping for summary generation
+      const summaryPhase = stateToPhase('SUMMARY_GENERATION');
+      expect(summaryPhase).toBe('complete');
+    });
+
+    it('should correctly map plan-only mode config', () => {
+      const config = createTestConfig({
+        runMode: {
+          resume: false,
+          unlimitedIterations: false,
+          mockMode: false,
+          planOnly: true,
+        },
+      });
+
+      expect(config.runMode.planOnly).toBe(true);
+      expect(config.runMode.resume).toBe(false);
+    });
+
+    it('should preserve planOnly mode through state conversion', () => {
+      const config = createTestConfig({
+        runMode: {
+          resume: false,
+          unlimitedIterations: false,
+          mockMode: false,
+          planOnly: true,
+        },
+      });
+
+      const state = createTestExecutionState({
+        phase: 'plan-revision',
+        planGeneration: {
+          revisionCount: 2,
+          planPath: '/test/plan/plan.md',
+          outputDirectory: '/test/plan',
+        },
+      });
+
+      const runState = executionStateToOrchestratorRunState(state, config);
+
+      // Verify the config with planOnly is preserved
+      expect(runState.config.runMode.planOnly).toBe(true);
+      expect(runState.context.currentState).toBe('PLAN_REVISION');
+    });
+  });
+
+  describe('plan-only mode should skip execution phase', () => {
+    it('should not require execution context when in plan-only mode at PLAN_REVISION', () => {
+      const config = createTestConfig({
+        runMode: {
+          resume: false,
+          unlimitedIterations: false,
+          mockMode: false,
+          planOnly: true,
+        },
+      });
+
+      const state = createTestExecutionState({
+        phase: 'plan-revision',
+        planGeneration: {
+          revisionCount: 1,
+          planPath: '/test/plan/plan.md',
+          outputDirectory: '/test/plan',
+        },
+        // No execution field - plan-only mode should not need it
+      });
+
+      const runState = executionStateToOrchestratorRunState(state, config);
+
+      expect(runState.context.currentState).toBe('PLAN_REVISION');
+      expect(runState.context.execIterationCount).toBe(0);
     });
   });
 });

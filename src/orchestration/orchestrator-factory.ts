@@ -126,6 +126,7 @@ export interface LegacyConfigOptions {
   workingDirectory?: string;
   artifactBaseDir?: string;
   runId?: string;
+  planOnly?: boolean;
 }
 
 /**
@@ -166,6 +167,7 @@ export function legacyOptionsToEffectiveConfig(options: LegacyConfigOptions): Ef
       resume: options.resumeFlag ?? false,
       unlimitedIterations: options.isDestinyMode ?? false,
       mockMode: false,
+      planOnly: options.planOnly ?? false,
     },
     fallback: {
       fallbackTools: (options.fallbackCliTools ?? []).map(cliToolTypeToName),

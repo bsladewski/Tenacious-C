@@ -88,6 +88,10 @@ describe('State Machine', () => {
     it('should allow FAILED to IDLE for restart', () => {
       expect(isValidTransition('FAILED', 'IDLE')).toBe(true);
     });
+
+    it('should allow PLAN_REVISION to SUMMARY_GENERATION for plan-only mode', () => {
+      expect(isValidTransition('PLAN_REVISION', 'SUMMARY_GENERATION')).toBe(true);
+    });
   });
 
   describe('transition', () => {
@@ -206,6 +210,33 @@ describe('State Machine', () => {
         expect(result.newState).toBe('EXECUTION');
         expect(result.context.execIterationCount).toBe(2);
         expect(result.context.followUpIterationCount).toBe(0);
+      });
+    });
+
+    describe('GENERATE_SUMMARY event', () => {
+      it('should transition from PLAN_REVISION to SUMMARY_GENERATION for plan-only mode', () => {
+        const context: OrchestrationContext = { ...createInitialContext(), currentState: 'PLAN_REVISION' };
+        const result = transition(context, { type: 'GENERATE_SUMMARY' });
+        expect(result.valid).toBe(true);
+        expect(result.newState).toBe('SUMMARY_GENERATION');
+        expect(result.description).toBe('Generating final summary');
+      });
+
+      it('should transition from GAP_AUDIT to SUMMARY_GENERATION', () => {
+        const context: OrchestrationContext = { ...createInitialContext(), currentState: 'GAP_AUDIT' };
+        const result = transition(context, { type: 'GENERATE_SUMMARY' });
+        expect(result.valid).toBe(true);
+        expect(result.newState).toBe('SUMMARY_GENERATION');
+      });
+
+      it('should NOT allow GENERATE_SUMMARY from EXECUTION (not in VALID_TRANSITIONS)', () => {
+        // EXECUTION -> SUMMARY_GENERATION is not in VALID_TRANSITIONS
+        // The event handler sets newState but validation fails
+        // This was the root cause of the original plan-only mode bug
+        const context: OrchestrationContext = { ...createInitialContext(), currentState: 'EXECUTION' };
+        const result = transition(context, { type: 'GENERATE_SUMMARY' });
+        expect(result.valid).toBe(false);
+        expect(result.newState).toBe('EXECUTION'); // State unchanged due to invalid transition
       });
     });
 

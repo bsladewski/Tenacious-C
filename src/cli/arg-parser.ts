@@ -276,6 +276,11 @@ export function parseArgs(argv: string[]): ParseResult {
         break;
       }
 
+      case '--plan-only': {
+        result.planOnly = true;
+        break;
+      }
+
       default: {
         // Check for unknown flags
         if (arg.startsWith('--')) {

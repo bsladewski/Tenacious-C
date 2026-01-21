@@ -286,11 +286,44 @@ describe('execute-with-fallback', () => {
     beforeEach(() => {
       console.log = vi.fn();
       vi.resetAllMocks();
+      // Use fake timers to avoid waiting for real 10-second retry delays
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
       console.log = originalLog;
+      // Restore real timers
+      vi.useRealTimers();
     });
+
+    /**
+     * Helper to execute an async operation while advancing fake timers.
+     * This allows tests to complete quickly without waiting for real delays.
+     */
+    async function executeWithFakeTimers<T>(promise: Promise<T>): Promise<T> {
+      // Track the result/error from the promise
+      let result: T | undefined;
+      let error: Error | undefined;
+      let settled = false;
+
+      promise
+        .then((r) => { result = r; settled = true; })
+        .catch((e) => { error = e; settled = true; });
+      
+      // Keep advancing timers until the promise settles
+      while (!settled) {
+        // Advance timers by a small amount to process pending timeouts
+        await vi.advanceTimersByTimeAsync(100);
+        // Yield to allow promise microtasks to execute
+        await Promise.resolve();
+      }
+      
+      // Rethrow error or return result
+      if (error) {
+        throw error;
+      }
+      return result as T;
+    }
 
     describe('Test Case 1: Validation failure when execution succeeds but summary file is missing', () => {
       it('should throw an error when summary file is missing', async () => {
@@ -307,18 +340,18 @@ describe('execute-with-fallback', () => {
           executionIteration: 1,
         };
 
-        // Execute and verify error is thrown
-        await expect(
-          executeWithEngineAdapter('mock', 'test prompt', null, [], context)
-        ).rejects.toThrow('Artifact validation failed');
-
-        // Verify the error message contains the missing filename
+        // Execute and verify error is thrown (using fake timers to avoid real delays)
+        let caughtError: Error | null = null;
         try {
-          await executeWithEngineAdapter('mock', 'test prompt', null, [], context);
+          await executeWithFakeTimers(executeWithEngineAdapter('mock', 'test prompt', null, [], context));
         } catch (error) {
-          expect((error as Error).message).toContain('execution-summary-1.md');
-          expect((error as Error).message).toContain('Missing files');
+          caughtError = error as Error;
         }
+
+        expect(caughtError).not.toBeNull();
+        expect(caughtError!.message).toContain('Artifact validation failed');
+        expect(caughtError!.message).toContain('execution-summary-1.md');
+        expect(caughtError!.message).toContain('Missing files');
       });
     });
 
@@ -337,40 +370,38 @@ describe('execute-with-fallback', () => {
           executionIteration: 1,
         };
 
-        // Execute and verify error is thrown
-        await expect(
-          executeWithEngineAdapter('mock', 'test prompt', null, [], context)
-        ).rejects.toThrow('Artifact validation failed');
-
-        // Verify the error message contains the validation error
+        // Execute and verify error is thrown (using fake timers to avoid real delays)
+        let caughtError: Error | null = null;
         try {
-          await executeWithEngineAdapter('mock', 'test prompt', null, [], context);
+          await executeWithFakeTimers(executeWithEngineAdapter('mock', 'test prompt', null, [], context));
         } catch (error) {
-          expect((error as Error).message).toContain('Validation errors');
-          expect((error as Error).message).toContain('missing required field schemaVersion');
+          caughtError = error as Error;
         }
+
+        expect(caughtError).not.toBeNull();
+        expect(caughtError!.message).toContain('Artifact validation failed');
+        expect(caughtError!.message).toContain('Validation errors');
+        expect(caughtError!.message).toContain('missing required field schemaVersion');
       });
     });
 
     describe('Test Case 3: Fallback is triggered when validation fails on primary adapter', () => {
-      it('should trigger fallback and succeed when validation fails on primary but succeeds on fallback', async () => {
-        // Setup: Mock validation to fail on first call (primary), succeed on second (fallback)
-        // Note: We need to use different adapters for primary/fallback since same adapters are skipped
-        // We'll use 'mock' as primary, and test that fallback IS attempted even though it's the same
-        // The fallback skip logic is intentional - this test verifies validation triggers fallback flow
+      it('should succeed when validation fails initially but succeeds on retry', async () => {
+        // Setup: Mock validation to fail on first call, succeed on subsequent calls (retry)
+        // With maxRetries=2, there are 3 total attempts - validation succeeds on retry
         
         let validationCallCount = 0;
         (validateExecutionArtifacts as Mock).mockImplementation(() => {
           validationCallCount++;
           if (validationCallCount === 1) {
-            // First call (primary adapter) - fail validation
+            // First call (attempt 0) - fail validation
             return {
               valid: false,
               missing: ['execution-summary-1.md'],
               errors: [],
             };
           }
-          // Subsequent calls (fallback adapter) - succeed
+          // Subsequent calls (retries) - succeed
           return {
             valid: true,
             missing: [],
@@ -384,45 +415,31 @@ describe('execute-with-fallback', () => {
           executionIteration: 1,
         };
 
-        // When validation fails on primary and the only fallback is the same adapter,
-        // the fallback is skipped and an error is thrown. This is expected behavior.
-        // The important thing is that the validation failure TRIGGERS the fallback flow.
-        // 
-        // We verify this by checking that:
-        // 1. The error mentions fallback was attempted (console.log shows "Primary engine adapter failed")
-        // 2. The validation was called (meaning execution completed before validation failed)
-        
-        try {
-          await executeWithEngineAdapter(
-            'mock',
-            'test prompt',
-            null,
-            ['mock'], // Same as primary - will be skipped
-            context
-          );
-          // If we get here, the test should fail
-          expect.fail('Expected error to be thrown');
-        } catch (error) {
-          // Expected: All adapters failed because fallback was same as primary
-          expect((error as Error).message).toContain('All engine adapters failed');
-        }
+        // With retry logic, validation failure on first attempt triggers retry
+        // Second attempt succeeds, so the result should be success
+        const result = await executeWithFakeTimers(executeWithEngineAdapter(
+          'mock',
+          'test prompt',
+          null,
+          ['mock'], // Fallbacks won't be used since retry succeeds
+          context
+        ));
 
-        // Verify the fallback flow was triggered (console shows primary failure)
-        const logCalls = (console.log as Mock).mock.calls.flat().join(' ');
-        expect(logCalls).toContain('Primary engine adapter failed');
-        expect(validationCallCount).toBe(1); // Validation was called once for primary
+        // Verify success after retry
+        expect(result.success).toBe(true);
+        expect(result.fallbackOccurred).toBe(false); // Retry succeeded, no fallback needed
+        // Validation called twice: once for initial attempt (fail), once for retry (success)
+        expect(validationCallCount).toBe(2);
       });
 
-      it('should succeed when fallback uses a different adapter that passes validation', async () => {
-        // This test verifies actual successful fallback when using different adapters
-        // We mock validation to fail first time, pass second time
-        // Since cursor/claude etc need real binaries, we verify the flow by checking
-        // that with a single 'mock' adapter (no real fallback possible), the error path works
+      it('should fail after exhausting all retries when validation always fails', async () => {
+        // This test verifies that when validation always fails, retries are exhausted
+        // With maxRetries=2, there are 3 total attempts
         
         let validationCallCount = 0;
         (validateExecutionArtifacts as Mock).mockImplementation(() => {
           validationCallCount++;
-          // Always fail - testing that validation error triggers fallback attempt
+          // Always fail - testing retry exhaustion
           return {
             valid: false,
             missing: ['execution-summary-1.md'],
@@ -436,13 +453,18 @@ describe('execute-with-fallback', () => {
           executionIteration: 1,
         };
 
-        // No fallbacks means error is thrown after primary fails
-        await expect(
-          executeWithEngineAdapter('mock', 'test prompt', null, [], context)
-        ).rejects.toThrow('Artifact validation failed');
+        // No fallbacks means error is thrown after primary exhausts retries
+        let caughtError: Error | null = null;
+        try {
+          await executeWithFakeTimers(executeWithEngineAdapter('mock', 'test prompt', null, [], context));
+        } catch (error) {
+          caughtError = error as Error;
+        }
 
-        // With empty fallback list, validation error causes immediate failure
-        expect(validationCallCount).toBe(1);
+        expect(caughtError).not.toBeNull();
+        expect(caughtError!.message).toContain('Artifact validation failed');
+        // With maxRetries=2, there are 3 total attempts (0, 1, 2)
+        expect(validationCallCount).toBe(3);
       });
     });
 
@@ -461,10 +483,10 @@ describe('execute-with-fallback', () => {
           executionIteration: 1,
         };
 
-        // Execute and catch the error
+        // Execute and catch the error (using fake timers)
         let caughtError: Error | null = null;
         try {
-          await executeWithEngineAdapter('mock', 'test prompt', null, [], context);
+          await executeWithFakeTimers(executeWithEngineAdapter('mock', 'test prompt', null, [], context));
         } catch (error) {
           caughtError = error as Error;
         }
@@ -491,14 +513,14 @@ describe('execute-with-fallback', () => {
           outputDirectory: '/tmp/test-plan',
         };
 
-        // Execute
-        const result = await executeWithEngineAdapter(
+        // Execute (using fake timers since we're in the fake timer describe block)
+        const result = await executeWithFakeTimers(executeWithEngineAdapter(
           'mock',
           'test prompt',
           null,
           [],
           context
-        );
+        ));
 
         // Verify success without error
         expect(result.success).toBe(true);
@@ -521,17 +543,17 @@ describe('execute-with-fallback', () => {
           executionIteration: 1,
         };
 
-        // Execute and verify error is thrown
-        await expect(
-          executeWithEngineAdapter('mock', 'test prompt', null, [], context)
-        ).rejects.toThrow('Artifact validation failed');
-
-        // Verify the error message contains the missing metadata filename
+        // Execute and verify error is thrown (using fake timers)
+        let caughtError: Error | null = null;
         try {
-          await executeWithEngineAdapter('mock', 'test prompt', null, [], context);
+          await executeWithFakeTimers(executeWithEngineAdapter('mock', 'test prompt', null, [], context));
         } catch (error) {
-          expect((error as Error).message).toContain('gap-audit-metadata.json');
+          caughtError = error as Error;
         }
+
+        expect(caughtError).not.toBeNull();
+        expect(caughtError!.message).toContain('Artifact validation failed');
+        expect(caughtError!.message).toContain('gap-audit-metadata.json');
       });
     });
   });

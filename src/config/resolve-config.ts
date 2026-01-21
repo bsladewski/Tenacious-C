@@ -40,6 +40,7 @@ export interface CliFlags {
   jsonOutput?: boolean;
   noInteractive?: boolean;
   workingDirectory?: string;
+  planOnly?: boolean;
 }
 
 /**
@@ -302,6 +303,7 @@ export function resolveConfig(
       resume: cliFlags.resume ?? DEFAULT_CONFIG.runMode.resume,
       unlimitedIterations,
       mockMode: cliFlags.mockMode ?? DEFAULT_CONFIG.runMode.mockMode,
+      planOnly: cliFlags.planOnly ?? DEFAULT_CONFIG.runMode.planOnly,
     },
 
     fallback: {

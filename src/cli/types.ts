@@ -83,6 +83,9 @@ export interface ParsedArgs {
 
   /** Enable nemesis mode for more adversarial gap audits */
   nemesis: boolean;
+
+  /** Plan only mode - skip execution after plan is complete */
+  planOnly: boolean;
 }
 
 /** Default values for parsed arguments */
@@ -112,6 +115,7 @@ export const DEFAULT_ARGS: ParsedArgs = {
   debug: false,
   jsonOutput: false,
   nemesis: false,
+  planOnly: false,
 };
 
 /** Result of parsing arguments */

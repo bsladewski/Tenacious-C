@@ -217,6 +217,25 @@ describe('parseArgs', () => {
       expect(result.args?.jsonOutput).toBe(true);
     });
 
+    it('should parse --plan-only', () => {
+      const result = parseArgs(['node', 'script.js', 'prompt', '--plan-only']);
+      expect(result.success).toBe(true);
+      expect(result.args?.planOnly).toBe(true);
+    });
+
+    it('should combine --plan-only with other flags', () => {
+      const result = parseArgs([
+        'node', 'script.js', 'prompt',
+        '--plan-only',
+        '--plan-confidence', '95',
+        '--max-plan-iterations', '5'
+      ]);
+      expect(result.success).toBe(true);
+      expect(result.args?.planOnly).toBe(true);
+      expect(result.args?.planConfidence).toBe(95);
+      expect(result.args?.maxPlanIterations).toBe(5);
+    });
+
     it('should parse combined verbosity flags', () => {
       const result = parseArgs(['node', 'script.js', 'prompt', '--verbose', '--debug', '--json']);
       expect(result.success).toBe(true);
@@ -278,6 +297,7 @@ describe('parseArgs', () => {
       expect(result.args?.verbose).toBe(false);
       expect(result.args?.debug).toBe(false);
       expect(result.args?.jsonOutput).toBe(false);
+      expect(result.args?.planOnly).toBe(false);
     });
   });
 

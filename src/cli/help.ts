@@ -25,6 +25,7 @@ Options:
   --resume                            Resume the most recent interrupted run
   --the-prompt-of-destiny             Override all iteration limits - continue until truly done
   --nemesis                           Enable nemesis mode for more adversarial gap audits
+  --plan-only                         Skip execution; stop after plan is complete and copy to working directory
   --mock                              Use mock CLI tool for testing (no AI costs)
   --mock-config <json|file>           Mock tool configuration (JSON string or file path)
   --no-interactive                    Disable interactive prompts; use defaults or fail
@@ -43,7 +44,8 @@ Examples:
   tenacious-c "Add user authentication" --plan-cli-tool codex --execute-cli-tool claude
   tenacious-c "Add user authentication" --preview-plan
   tenacious-c --resume
-  tenacious-c "Test task" --mock`;
+  tenacious-c "Test task" --mock
+  tenacious-c "Add user authentication" --plan-only`;
 }
 
 /** Print usage to stderr and exit */

@@ -16,6 +16,14 @@ export function getPlaceholderTemplate(): PromptTemplate {
 
 Treat the supplied requirements as binding.
 
+**IMPORTANT - AI AGENT EXECUTION:**
+This plan will be **executed automatically by an AI agent**, not by a human. Write all plan steps with this in mind:
+- Steps should be clear, actionable, and specific enough for an AI agent to execute
+- Use technical language and specific file paths, function names, and code patterns
+- Avoid vague instructions like "review the code" or "check if X works" - instead specify what to check and how
+- Each step should be a concrete action the AI agent can perform (e.g., "Create file X with Y structure", "Update function Z to handle case A")
+- Think of this as writing instructions for another AI agent, not documentation for human review
+
 Follow instruction precedence (highest to lowest):
 
 1. This command's rules  
@@ -173,6 +181,15 @@ Every plan file MUST follow this top-level structure:
 > In **audit-driven mode**, you MUST further structure \`# Implementation Plan\` as described in "AUDIT-DRIVEN PLANNING MODE" below.
 
 ## Step-by-step
+
+**Write steps for AI agent execution:**
+- Each step should be a concrete, actionable instruction that an AI agent can execute
+- Be specific: include file paths, function names, code patterns, and exact changes to make
+- Avoid vague language like "review", "check", "consider" - instead specify what to implement or modify
+- Use imperative mood: "Create file X", "Update function Y", "Add test Z"
+- Include technical details: data structures, API endpoints, component names, etc.
+- Think: "If I were an AI agent reading this, could I execute it without ambiguity?"
+
 1. <step>  
 2. <step>  
 3. <step>  

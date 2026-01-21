@@ -230,6 +230,7 @@ describe('orchestratorRunStateToExecutionState', () => {
         resume: false,
         unlimitedIterations: true,
         mockMode: false,
+        planOnly: false,
       },
     });
     const runState = {

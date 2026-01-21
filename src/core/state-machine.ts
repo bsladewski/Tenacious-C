@@ -92,7 +92,7 @@ export interface TransitionResult {
 const VALID_TRANSITIONS: Record<OrchestrationState, OrchestrationState[]> = {
   IDLE: ['PLAN_GENERATION'],
   PLAN_GENERATION: ['PLAN_REVISION', 'EXECUTION', 'FAILED'],
-  PLAN_REVISION: ['PLAN_REVISION', 'EXECUTION', 'FAILED'],
+  PLAN_REVISION: ['PLAN_REVISION', 'EXECUTION', 'SUMMARY_GENERATION', 'FAILED'],
   EXECUTION: ['FOLLOW_UPS', 'GAP_AUDIT', 'FAILED'],
   FOLLOW_UPS: ['FOLLOW_UPS', 'GAP_AUDIT', 'FAILED'],
   GAP_AUDIT: ['GAP_PLAN', 'SUMMARY_GENERATION', 'FAILED'],
@@ -299,6 +299,7 @@ export function transition(
 
     case 'GENERATE_SUMMARY':
       if (
+        currentState === 'PLAN_REVISION' ||
         currentState === 'GAP_AUDIT' ||
         currentState === 'GAP_PLAN' ||
         currentState === 'EXECUTION'
