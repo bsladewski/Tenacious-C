@@ -22,7 +22,7 @@ export function syncStateWithArtifacts(
 
   // Determine artifact-based values
   // followUpIterationCount represents the NEXT iteration to execute, so we add 1 to the last completed iteration
-  // This matches how the state is initialized in plan.ts and resume-plan.ts
+  // This matches how the state is initialized in orchestrator-plan.ts
   const artifactFollowUpIteration = artifacts.lastFollowUpIteration !== null
     ? artifacts.lastFollowUpIteration + 1
     : 0;

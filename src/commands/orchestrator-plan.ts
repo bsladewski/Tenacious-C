@@ -1,10 +1,10 @@
 /**
- * Experimental Orchestrator-based plan execution
+ * Orchestrator-based plan execution
  *
- * This module provides an alternative entry point for plan execution
- * using the new Orchestrator class with explicit state machine.
+ * This module provides the main entry point for plan execution
+ * using the Orchestrator class with explicit state machine.
  *
- * Enable with: --experimental-orchestrator
+ * This is the default execution engine for tenacious-c.
  */
 
 import { existsSync } from 'fs';
@@ -34,7 +34,14 @@ import {
   readGapAuditMetadata,
   validateExecutionArtifacts,
   validatePlanArtifacts,
+  saveExecutionState,
+  findLatestResumableRun,
 } from '../io';
+import {
+  orchestratorRunStateToExecutionState,
+  executionStateToOrchestratorRunState,
+  extractResumeContext,
+} from '../core';
 import { promptForAnswers, formatAnswers, promptForHardBlockerResolution, formatHardBlockerResolutions, previewPlan } from '../ui';
 import { generateFinalSummary } from '../logging';
 import { getCliToolForAction, executeWithFallback, selectCliTool, selectCliToolForAction } from '../engines';
@@ -76,6 +83,23 @@ interface OrchestratorPlanContext {
 }
 
 /**
+ * Persist current orchestration state to disk
+ */
+function persistState(ctx: OrchestratorPlanContext): void {
+  const runState = ctx.orchestrator.getRunState();
+  const executionState = orchestratorRunStateToExecutionState(
+    runState,
+    ctx.timestampDirectory,
+    ctx.config.input,
+    ctx.planOutputDirectory,
+    ctx.currentPlanPath,
+    ctx.currentExecuteOutputDirectory,
+    ctx.currentGapAuditOutputDirectory
+  );
+  saveExecutionState(ctx.timestampDirectory, executionState);
+}
+
+/**
  * Execute plan using the Orchestrator state machine
  */
 export async function executePlanWithOrchestrator(
@@ -101,7 +125,7 @@ export async function executePlanWithOrchestrator(
   jsonOutput: boolean = false,
   nemesis: boolean = false
 ): Promise<void> {
-  console.log('\n🧪 Running with experimental Orchestrator...\n');
+  console.log('\n🚀 Starting execution...\n');
 
   // Convert input to requirements
   let requirements: string;
@@ -140,15 +164,47 @@ export async function executePlanWithOrchestrator(
     nonInteractive: noInteractive,
   });
 
-  // Set up directories
-  const timestampDirectory = resolve(config.paths.artifactBaseDir, config.runId);
-  const planOutputDirectory = resolve(timestampDirectory, 'plan');
+  // Handle resume or new run
+  let timestampDirectory: string;
+  let planOutputDirectory: string;
+  let currentPlanPath: string;
+  let currentExecuteOutputDirectory: string | undefined;
+  let currentGapAuditOutputDirectory: string | undefined;
 
-  // Ensure directories exist
-  await deps.fileSystem.mkdir(planOutputDirectory, true);
+  if (resumeFlag) {
+    // Find latest resumable run
+    const tenaciousCDir = config.paths.artifactBaseDir;
+    const savedState = findLatestResumableRun(tenaciousCDir);
 
-  // Write requirements
-  writeRequirements(timestampDirectory, requirements);
+    if (!savedState) {
+      console.error('\n❌ No resumable run found. Start a new run without --resume.\n');
+      process.exit(1);
+    }
+
+    // Use directories from saved state
+    timestampDirectory = savedState.timestampDirectory;
+    const resumeContext = extractResumeContext(savedState, timestampDirectory);
+    planOutputDirectory = resumeContext.planOutputDirectory;
+    currentPlanPath = resumeContext.currentPlanPath;
+    currentExecuteOutputDirectory = resumeContext.currentExecuteOutputDirectory;
+    currentGapAuditOutputDirectory = resumeContext.currentGapAuditOutputDirectory;
+
+    // Resume uses the saved requirements
+    requirements = savedState.requirements;
+
+    console.log(`\n📂 Resuming from: ${timestampDirectory}`);
+  } else {
+    // Set up new directories
+    timestampDirectory = resolve(config.paths.artifactBaseDir, config.runId);
+    planOutputDirectory = resolve(timestampDirectory, 'plan');
+    currentPlanPath = resolve(planOutputDirectory, 'plan.md');
+
+    // Ensure directories exist
+    await deps.fileSystem.mkdir(planOutputDirectory, true);
+
+    // Write requirements
+    writeRequirements(timestampDirectory, requirements);
+  }
 
   // Create context for orchestration
   const ctx: OrchestratorPlanContext = {
@@ -158,7 +214,7 @@ export async function executePlanWithOrchestrator(
     timestampDirectory,
     planOutputDirectory,
     requirementsPath: resolve(timestampDirectory, 'requirements.txt'),
-    currentPlanPath: resolve(planOutputDirectory, 'plan.md'),
+    currentPlanPath,
     currentPlanCliTool: planCliTool,
     currentPlanModel: planModel,
     currentExecuteCliTool: executeCliTool,
@@ -168,15 +224,40 @@ export async function executePlanWithOrchestrator(
     currentFallbackTools: [...fallbackCliTools],
     specifiedCliTool,
     nemesis,
+    currentExecuteOutputDirectory,
+    currentGapAuditOutputDirectory,
   };
 
-  // Start orchestration
-  const startResult = orchestrator.start(requirements);
-  if (!startResult.success) {
-    throw new Error(`Failed to start orchestration: ${startResult.description}`);
-  }
+  // Start or resume orchestration
+  if (resumeFlag) {
+    // Load saved state and resume
+    const tenaciousCDir = config.paths.artifactBaseDir;
+    const savedState = findLatestResumableRun(tenaciousCDir);
 
-  console.log(`📋 ${orchestrator.getStateDescription()}`);
+    if (!savedState) {
+      // This shouldn't happen as we checked above, but TypeScript needs it
+      throw new Error('No resumable run found');
+    }
+
+    // Convert ExecutionState to OrchestratorRunState
+    const orchestratorState = executionStateToOrchestratorRunState(savedState, config);
+
+    // Resume from saved state
+    const resumeResult = orchestrator.resume(orchestratorState);
+    if (!resumeResult.success) {
+      throw new Error(`Failed to resume orchestration: ${resumeResult.description}`);
+    }
+
+    console.log(`📋 Resumed: ${orchestrator.getStateDescription()}`);
+  } else {
+    // Start new orchestration
+    const startResult = orchestrator.start(requirements);
+    if (!startResult.success) {
+      throw new Error(`Failed to start orchestration: ${startResult.description}`);
+    }
+
+    console.log(`📋 ${orchestrator.getStateDescription()}`);
+  }
 
   // Run the orchestration loop
   await runOrchestrationLoop(ctx, previewPlanFlag);
@@ -267,6 +348,11 @@ async function handlePlanGeneration(ctx: OrchestratorPlanContext): Promise<void>
   const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
   const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
+  // Store the selected tool type in context for subsequent iterations
+  if (!ctx.currentPlanCliTool) {
+    ctx.currentPlanCliTool = planToolType;
+  }
+
   // Execute with fallback
   const context: ExecutionContext = {
     phase: 'plan-generation',
@@ -309,6 +395,7 @@ async function handlePlanGeneration(ctx: OrchestratorPlanContext): Promise<void>
 
   // Transition to revision phase
   orchestrator.onPlanGenerated();
+  persistState(ctx);
   console.log(`✅ Initial plan generated`);
 }
 
@@ -382,6 +469,11 @@ async function handlePlanRevision(
       const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
       const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
+      // Store the selected tool type in context for subsequent iterations
+      if (!ctx.currentPlanCliTool) {
+        ctx.currentPlanCliTool = planToolType;
+      }
+
       console.log(`\n🔄 Revising plan with your answers (revision ${formatIteration(revisionCount + 1, config.limits.maxPlanIterations, isDestinyMode)})...`);
 
       const answerContext: ExecutionContext = {
@@ -405,6 +497,7 @@ async function handlePlanRevision(
       }
 
       orchestrator.onQuestionsAnswered();
+      persistState(ctx);
       return;
     }
 
@@ -422,6 +515,11 @@ async function handlePlanRevision(
 
       const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
       const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
+
+      // Store the selected tool type in context for subsequent iterations
+      if (!ctx.currentPlanCliTool) {
+        ctx.currentPlanCliTool = planToolType;
+      }
 
       console.log(`\n🔄 Improving plan completeness (revision ${formatIteration(revisionCount + 1, config.limits.maxPlanIterations, isDestinyMode)})...`);
 
@@ -446,6 +544,7 @@ async function handlePlanRevision(
       }
 
       orchestrator.onPlanImproved();
+      persistState(ctx);
       return;
     }
 
@@ -466,6 +565,7 @@ async function handlePlanRevision(
     }
 
     orchestrator.onPlanComplete(metadata.confidence);
+    persistState(ctx);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
       console.error('\n❌ Could not read plan-metadata.json. Cannot continue without metadata.');
@@ -508,6 +608,11 @@ async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
 
   const executeTool = await getCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
   const executeToolType = await selectCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
+
+  // Store the selected tool type in context for subsequent iterations
+  if (!ctx.currentExecuteCliTool) {
+    ctx.currentExecuteCliTool = executeToolType;
+  }
 
   const executeContext: ExecutionContext = {
     phase: 'execute-plan',
@@ -568,6 +673,7 @@ async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
 
     // Store execute directory in context for follow-ups
     ctx.currentExecuteOutputDirectory = executeOutputDirectory;
+    persistState(ctx);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
       console.error('\n❌ Could not read execute-metadata.json. Cannot continue without metadata.');
@@ -621,6 +727,15 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
       const executeTool = await getCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
       const executeToolType = await selectCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
 
+      if (!executeToolType) {
+        throw new Error('Failed to determine CLI tool for follow-up execution. Please specify --execute-cli-tool or ensure a tool preference is saved.');
+      }
+
+      // Store the selected tool type in context for subsequent iterations
+      if (!ctx.currentExecuteCliTool) {
+        ctx.currentExecuteCliTool = executeToolType;
+      }
+
       const followUpContext: ExecutionContext = {
         phase: 'execute-follow-ups',
         outputDirectory: executeOutputDirectory,
@@ -643,6 +758,7 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
       }
 
       orchestrator.onHardBlockersResolved();
+      persistState(ctx);
       return;
     }
 
@@ -656,6 +772,7 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
         console.log('\n✅ All follow-ups complete!');
         orchestrator.onFollowUpsComplete(false);
       }
+      persistState(ctx);
       return;
     }
 
@@ -686,6 +803,15 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
     const executeTool = await getCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
     const executeToolType = await selectCliToolForAction('execute', ctx.currentExecuteCliTool, ctx.specifiedCliTool);
 
+    if (!executeToolType) {
+      throw new Error('Failed to determine CLI tool for follow-up execution. Please specify --execute-cli-tool or ensure a tool preference is saved.');
+    }
+
+    // Store the selected tool type in context for subsequent iterations
+    if (!ctx.currentExecuteCliTool) {
+      ctx.currentExecuteCliTool = executeToolType;
+    }
+
     const followUpContext: ExecutionContext = {
       phase: 'execute-follow-ups',
       outputDirectory: executeOutputDirectory,
@@ -710,6 +836,7 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
     // Read updated metadata
     const updatedMetadata = readExecuteMetadata(executeOutputDirectory);
     orchestrator.onFollowUpsComplete(updatedMetadata.hasFollowUps);
+    persistState(ctx);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
       console.error('\n❌ Could not read execute-metadata.json. Cannot continue without metadata.');
@@ -748,6 +875,11 @@ async function handleGapAudit(ctx: OrchestratorPlanContext): Promise<void> {
 
   const auditTool = await getCliToolForAction('audit', ctx.currentAuditCliTool, ctx.specifiedCliTool);
   const auditToolType = await selectCliToolForAction('audit', ctx.currentAuditCliTool, ctx.specifiedCliTool);
+
+  // Store the selected tool type in context for subsequent iterations
+  if (!ctx.currentAuditCliTool) {
+    ctx.currentAuditCliTool = auditToolType;
+  }
 
   const auditContext: ExecutionContext = {
     phase: 'gap-audit',
@@ -789,13 +921,16 @@ async function handleGapAudit(ctx: OrchestratorPlanContext): Promise<void> {
       console.log('\n✅ No gaps identified. Implementation is complete!');
       orchestrator.onNoGapsFound();
       orchestrator.onGenerateSummary();
+      persistState(ctx);
     } else {
       orchestrator.onGapAuditComplete(true);
+      persistState(ctx);
     }
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
       console.log('\n⚠️  Could not read gap-audit-metadata.json. Assuming gaps were found and continuing...');
       orchestrator.onGapAuditComplete(true);
+      persistState(ctx);
     } else {
       throw error;
     }
@@ -816,6 +951,7 @@ async function handleGapPlan(ctx: OrchestratorPlanContext): Promise<void> {
     console.log(`\n⚠️  Reached maximum execution iterations (${config.limits.maxExecIterations}). Stopping.`);
     orchestrator.onMaxExecIterationsReached();
     orchestrator.onGenerateSummary();
+    persistState(ctx);
     return;
   }
 
@@ -844,6 +980,11 @@ async function handleGapPlan(ctx: OrchestratorPlanContext): Promise<void> {
   const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
   const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
 
+  // Store the selected tool type in context for subsequent iterations
+  if (!ctx.currentPlanCliTool) {
+    ctx.currentPlanCliTool = planToolType;
+  }
+
   const gapPlanContext: ExecutionContext = {
     phase: 'gap-plan',
     outputDirectory: gapPlanOutputDirectory,
@@ -870,4 +1011,5 @@ async function handleGapPlan(ctx: OrchestratorPlanContext): Promise<void> {
   ctx.currentPlanPath = resolve(gapPlanOutputDirectory, `gap-plan-${execIterationCount}.md`);
 
   orchestrator.onGapPlanComplete();
+  persistState(ctx);
 }

@@ -378,6 +378,7 @@ export function phaseToState(
     | 'plan-generation'
     | 'plan-revision'
     | 'execution'
+    | 'follow-ups'
     | 'gap-audit'
     | 'gap-plan'
     | 'complete'
@@ -386,6 +387,7 @@ export function phaseToState(
     'plan-generation': 'PLAN_GENERATION',
     'plan-revision': 'PLAN_REVISION',
     execution: 'EXECUTION',
+    'follow-ups': 'FOLLOW_UPS',
     'gap-audit': 'GAP_AUDIT',
     'gap-plan': 'GAP_PLAN',
     complete: 'COMPLETE',
@@ -398,13 +400,13 @@ export function phaseToState(
  */
 export function stateToPhase(
   state: OrchestrationState
-): 'plan-generation' | 'plan-revision' | 'execution' | 'gap-audit' | 'gap-plan' | 'complete' {
+): 'plan-generation' | 'plan-revision' | 'execution' | 'follow-ups' | 'gap-audit' | 'gap-plan' | 'complete' {
   const mapping: Record<OrchestrationState, string> = {
     IDLE: 'plan-generation',
     PLAN_GENERATION: 'plan-generation',
     PLAN_REVISION: 'plan-revision',
     EXECUTION: 'execution',
-    FOLLOW_UPS: 'execution',
+    FOLLOW_UPS: 'follow-ups',
     GAP_AUDIT: 'gap-audit',
     GAP_PLAN: 'gap-plan',
     SUMMARY_GENERATION: 'complete',
@@ -415,6 +417,7 @@ export function stateToPhase(
     | 'plan-generation'
     | 'plan-revision'
     | 'execution'
+    | 'follow-ups'
     | 'gap-audit'
     | 'gap-plan'
     | 'complete';

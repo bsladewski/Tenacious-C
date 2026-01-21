@@ -27,7 +27,6 @@ Options:
   --nemesis                           Enable nemesis mode for more adversarial gap audits
   --mock                              Use mock CLI tool for testing (no AI costs)
   --mock-config <json|file>           Mock tool configuration (JSON string or file path)
-  --experimental-orchestrator         Use experimental Orchestrator-based execution
   --no-interactive                    Disable interactive prompts; use defaults or fail
   --verbose                           Enable verbose output with more progress details
   --debug                             Enable debug mode with full diagnostics

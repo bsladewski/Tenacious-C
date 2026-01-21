@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { executePlan } from './commands/plan';
 import { executePlanWithOrchestrator } from './commands/orchestrator-plan';
 import { setMockConfig, MockConfig } from './engines/mock-config';
 import { readFileSync } from 'fs';
@@ -10,8 +9,8 @@ import { parseArgs, printUsage } from './cli';
 export { AICliTool } from './types/ai-cli-tool';
 export { ExecutionContext } from './types/execution-context';
 
-// Export plan command
-export { executePlan } from './commands/plan';
+// Export orchestrator plan command
+export { executePlanWithOrchestrator } from './commands/orchestrator-plan';
 
 // Export prompt template system
 export { PromptTemplate, interpolateTemplate } from './templates/prompt-template';
@@ -116,59 +115,30 @@ async function main() {
   }
 
   try {
-    // Choose execution path based on experimental flag
-    if (args.experimentalOrchestrator) {
-      // Use the new Orchestrator-based execution
-      await executePlanWithOrchestrator(
-        args.resume ? '' : args.input,
-        args.maxPlanIterations,
-        args.planConfidence,
-        args.maxFollowUpIterations,
-        args.execIterations,
-        args.thePromptOfDestiny,
-        args.cliTool,
-        args.previewPlan,
-        args.resume,
-        args.planModel,
-        args.executeModel,
-        args.auditModel,
-        args.planCliTool,
-        args.executeCliTool,
-        args.auditCliTool,
-        args.fallbackCliTools,
-        args.noInteractive,
-        args.verbose,
-        args.debug,
-        args.jsonOutput,
-        args.nemesis
-      );
-    } else {
-      // Use the legacy execution path
-      // If resume is set, input is ignored (can be empty string)
-      await executePlan(
-        args.resume ? '' : args.input,
-        args.maxPlanIterations,
-        args.planConfidence,
-        args.maxFollowUpIterations,
-        args.execIterations,
-        args.thePromptOfDestiny,
-        args.cliTool,
-        args.previewPlan,
-        args.resume,
-        args.planModel,
-        args.executeModel,
-        args.auditModel,
-        args.planCliTool,
-        args.executeCliTool,
-        args.auditCliTool,
-        args.fallbackCliTools,
-        args.noInteractive,
-        args.verbose,
-        args.debug,
-        args.jsonOutput,
-        args.nemesis
-      );
-    }
+    // Use the Orchestrator-based execution (now the default)
+    await executePlanWithOrchestrator(
+      args.resume ? '' : args.input,
+      args.maxPlanIterations,
+      args.planConfidence,
+      args.maxFollowUpIterations,
+      args.execIterations,
+      args.thePromptOfDestiny,
+      args.cliTool,
+      args.previewPlan,
+      args.resume,
+      args.planModel,
+      args.executeModel,
+      args.auditModel,
+      args.planCliTool,
+      args.executeCliTool,
+      args.auditCliTool,
+      args.fallbackCliTools,
+      args.noInteractive,
+      args.verbose,
+      args.debug,
+      args.jsonOutput,
+      args.nemesis
+    );
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

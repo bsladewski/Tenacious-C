@@ -251,11 +251,6 @@ export function parseArgs(argv: string[]): ParseResult {
         break;
       }
 
-      case '--experimental-orchestrator': {
-        result.experimentalOrchestrator = true;
-        break;
-      }
-
       case '--no-interactive': {
         result.noInteractive = true;
         break;

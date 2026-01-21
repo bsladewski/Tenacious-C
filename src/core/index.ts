@@ -47,3 +47,10 @@ export {
 // Execution state utilities
 export { createExecutionState } from './create-execution-state';
 export { syncStateWithArtifacts } from './sync-state-with-artifacts';
+
+// State conversion between ExecutionState and OrchestratorRunState
+export {
+  executionStateToOrchestratorRunState,
+  orchestratorRunStateToExecutionState,
+  extractResumeContext,
+} from './state-conversion';

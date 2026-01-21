@@ -193,12 +193,6 @@ describe('parseArgs', () => {
       expect(result.args?.cliTool).toBe('mock');
     });
 
-    it('should parse --experimental-orchestrator', () => {
-      const result = parseArgs(['node', 'script.js', 'prompt', '--experimental-orchestrator']);
-      expect(result.success).toBe(true);
-      expect(result.args?.experimentalOrchestrator).toBe(true);
-    });
-
     it('should parse --no-interactive', () => {
       const result = parseArgs(['node', 'script.js', 'prompt', '--no-interactive']);
       expect(result.success).toBe(true);
@@ -280,7 +274,6 @@ describe('parseArgs', () => {
       expect(result.args?.resume).toBe(false);
       expect(result.args?.mockMode).toBe(false);
       expect(result.args?.fallbackCliTools).toEqual([]);
-      expect(result.args?.experimentalOrchestrator).toBe(false);
       expect(result.args?.noInteractive).toBe(false);
       expect(result.args?.verbose).toBe(false);
       expect(result.args?.debug).toBe(false);

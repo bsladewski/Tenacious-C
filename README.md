@@ -332,17 +332,6 @@ tenacious-c "Add user authentication" --mock --mock-config mock-config.json
 
 **Note:** Mock mode is automatically selected when you use `--mock` or `--cli-tool mock`. It generates realistic outputs to enable end-to-end testing of the full workflow without calling real AI tools.
 
-#### `--experimental-orchestrator`
-
-Use the experimental Orchestrator-based execution engine. This is a newer implementation that uses an explicit state machine for orchestration, providing better state management and resumability.
-
-**Example:**
-```bash
-tenacious-c "Add user authentication" --experimental-orchestrator
-```
-
-**Note:** The experimental orchestrator is the recommended execution path for new runs. It provides improved state tracking, better error handling, and more reliable resume functionality.
-
 #### `--no-interactive`
 
 Disable interactive prompts and use defaults or fail if input is required. This is useful for scripted execution where user interaction is not possible.
@@ -396,19 +385,15 @@ Tenacious C follows a comprehensive workflow to ensure thorough plan generation 
 5. **Gap Analysis**: If gaps are found, performs gap audits and generates gap closure plans
 6. **Iterative Execution**: Repeats execution cycles until completion
 
-### Execution Modes
+### Execution Engine
 
-Tenacious C supports two execution modes:
-
-**Legacy Mode (Default):** The original execution engine with implicit state management. This mode is still supported but is being phased out in favor of the orchestrator mode.
-
-**Orchestrator Mode (Experimental):** A newer execution engine that uses an explicit state machine for orchestration. This mode provides:
+Tenacious C uses an Orchestrator-based execution engine with an explicit state machine. This provides:
 - Better state tracking and resumability
 - More reliable error handling
 - Clearer state transitions
 - Improved debugging capabilities
 
-Enable orchestrator mode with the `--experimental-orchestrator` flag. This is the recommended mode for new runs.
+The orchestrator automatically saves execution state at key checkpoints, allowing you to resume interrupted runs with `--resume`.
 
 ### Plan Generation & Refinement
 
@@ -607,9 +592,7 @@ src/
     help.ts                    # Help text generation
     types.ts                   # CLI type definitions
   commands/                    # Command implementations
-    plan.ts                    # Legacy plan command implementation
-    orchestrator-plan.ts       # Orchestrator-based plan execution
-    resume-plan.ts             # Resume interrupted execution
+    orchestrator-plan.ts       # Orchestrator-based plan execution (default)
   config/                      # Configuration management
     cli-tool-preference.ts     # CLI tool preference persistence
     resolve-config.ts           # Configuration resolution

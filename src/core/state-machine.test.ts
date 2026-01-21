@@ -304,6 +304,7 @@ describe('State Machine', () => {
       expect(phaseToState('plan-generation')).toBe('PLAN_GENERATION');
       expect(phaseToState('plan-revision')).toBe('PLAN_REVISION');
       expect(phaseToState('execution')).toBe('EXECUTION');
+      expect(phaseToState('follow-ups')).toBe('FOLLOW_UPS');
       expect(phaseToState('gap-audit')).toBe('GAP_AUDIT');
       expect(phaseToState('gap-plan')).toBe('GAP_PLAN');
       expect(phaseToState('complete')).toBe('COMPLETE');
@@ -315,7 +316,7 @@ describe('State Machine', () => {
       expect(stateToPhase('PLAN_GENERATION')).toBe('plan-generation');
       expect(stateToPhase('PLAN_REVISION')).toBe('plan-revision');
       expect(stateToPhase('EXECUTION')).toBe('execution');
-      expect(stateToPhase('FOLLOW_UPS')).toBe('execution');
+      expect(stateToPhase('FOLLOW_UPS')).toBe('follow-ups');
       expect(stateToPhase('GAP_AUDIT')).toBe('gap-audit');
       expect(stateToPhase('GAP_PLAN')).toBe('gap-plan');
       expect(stateToPhase('COMPLETE')).toBe('complete');

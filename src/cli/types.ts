@@ -69,9 +69,6 @@ export interface ParsedArgs {
   /** Show version and exit */
   version: boolean;
 
-  /** Use experimental Orchestrator-based execution */
-  experimentalOrchestrator: boolean;
-
   /** Disable interactive prompts; use defaults or fail */
   noInteractive: boolean;
 
@@ -110,7 +107,6 @@ export const DEFAULT_ARGS: ParsedArgs = {
   mockConfigPath: null,
   help: false,
   version: false,
-  experimentalOrchestrator: false,
   noInteractive: false,
   verbose: false,
   debug: false,
