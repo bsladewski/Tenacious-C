@@ -39,14 +39,17 @@ An intelligent, iterative AI-powered development tool that generates comprehensi
    npm install
    ```
 
-3. Build the project:
+3. Build and install the tool:
+
+   **Option A: Using npm commands:**
    ```bash
    npm run build
+   npm link
    ```
 
-4. Install the tool globally using npm link:
+   **Option B: Using make (if you have make installed):**
    ```bash
-   npm link
+   make install
    ```
 
    This will make the `tenacious-c` command available in your terminal.
