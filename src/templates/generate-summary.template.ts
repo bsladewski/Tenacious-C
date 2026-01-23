@@ -23,6 +23,7 @@ The execution artifacts are located in: \`{{timestampDirectory}}\`
    - Read the "Work Accomplished" sections from all execution summaries
    - Note the checklist items that were completed
    - Note any follow-ups that were addressed
+   - **IMPORTANT:** Read the "Verification Tools Executed" sections to document which verification tools were run and their results
 
 3. **Gap audits:** \`{{timestampDirectory}}/gap-audit-*/\` (if any)
    - Look for \`gap-audit-summary-*.md\` files
@@ -65,6 +66,15 @@ Generate a plain text summary suitable for terminal display. Use terminal-friend
   - Any significant metrics (if available)
 >
 
+🔍 VERIFICATION TOOLS EXECUTED
+───────────────────────────────────────────────────────────────
+<Summary of verification tools that were run and their results>
+<Include:
+  - Which verification tools were executed (e.g., npm run lint, npm run test, npm run build)
+  - Whether each tool passed or failed
+  - Brief summary of results (if available from execution summaries)
+>
+
 📊 EXECUTION STATISTICS
 ───────────────────────────────────────────────────────────────
 - Plan iterations: <number>
@@ -89,6 +99,7 @@ All artifacts saved to: {{timestampDirectory}}
 5. **Aggregate information** - Combine information from all execution summaries
 6. **Be specific** - Include concrete details about what was accomplished
 7. **Read all artifacts** - Don't miss any execution summaries or gap audits
+8. **Document verification** - Include information about verification tools that were executed and their results from the execution summaries
 
 ## Output File
 

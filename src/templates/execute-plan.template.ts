@@ -121,6 +121,11 @@ If a full-suite run is not explicitly required, you may recommend it in "Follow-
 - If any verification command fails, you MUST fix the issue and re-run until it passes
 - Do NOT mark the execution as complete unless ALL verification gates pass
 - If a verification command is failing and cannot be fixed, document it clearly in the execution summary and add a follow-up
+- **CRITICAL:** You MUST document all verification tools that were executed in the "Verification Tools Executed" section of the execution summary, including:
+  - The exact command that was run
+  - Whether it passed or failed
+  - A summary of the output/results (key information, not necessarily full output)
+  - Any issues encountered and how they were resolved
 
 **Verification Requirements are binding.** They were selected based on the repository's tooling and the nature of the planned changes.
 
@@ -174,6 +179,19 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 - <List key changes, files created/modified, features implemented>
 - <Include metrics if relevant: tests added, lines changed, etc.>
 - <Be specific and comprehensive - this summary will be used to generate a final report>
+
+# Verification Tools Executed
+- <Document each verification tool that was run from the "Verification Tools / Gates" section>
+- <For each tool, include:
+  - Command that was executed
+  - Whether it passed or failed
+  - Key output/results (summary, not full output unless critical)
+  - Any issues encountered and how they were resolved>
+- <Example format:
+  - \`npm run lint\`: ✅ PASSED - No linting errors found
+  - \`npm run test\`: ✅ PASSED - All 42 tests passed
+  - \`npm run build\`: ✅ PASSED - Build completed successfully>
+- <If any verification tool failed and could not be fixed, document it clearly and add a follow-up>
 
 # Tests & Lint Run
 - <commands or scripts used>

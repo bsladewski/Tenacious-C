@@ -122,6 +122,11 @@ If a full-suite run is not explicitly required, you may recommend it in "Follow-
 - If any follow-up items involve code changes, you MUST ensure all verification commands still pass after your changes
 - If any verification command fails after your changes, you MUST fix the issue before marking the follow-up as complete
 - Do NOT mark \`hasFollowUps\` as \`false\` unless all verification gates pass
+- **CRITICAL:** You MUST document all verification tools that were executed in the "Verification Tools Executed" section of the execution summary, including:
+  - The exact command that was run
+  - Whether it passed or failed
+  - A summary of the output/results (key information, not necessarily full output)
+  - Any issues encountered and how they were resolved
 
 **Verification Requirements are binding.** They were selected based on the repository's tooling and the nature of the planned changes.
 
@@ -174,6 +179,20 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 - <Include metrics if relevant: tests added, lines changed, etc.>
 - <Be specific and comprehensive - this summary will be used to generate a final report>
 - <If this is a follow-up iteration, also include cumulative work from previous iterations>
+
+# Verification Tools Executed
+- <Document each verification tool that was run from the "Verification Tools / Gates" section>
+- <For each tool, include:
+  - Command that was executed
+  - Whether it passed or failed
+  - Key output/results (summary, not full output unless critical)
+  - Any issues encountered and how they were resolved>
+- <Example format:
+  - \`npm run lint\`: ✅ PASSED - No linting errors found
+  - \`npm run test\`: ✅ PASSED - All 42 tests passed
+  - \`npm run build\`: ✅ PASSED - Build completed successfully>
+- <If any verification tool failed and could not be fixed, document it clearly and add a follow-up>
+- <If verification tools were already documented in a previous execution summary, you may reference that or update with current status>
 
 # Tests & Lint Run
 - <commands or scripts used>
