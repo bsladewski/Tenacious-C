@@ -319,10 +319,23 @@ export class Orchestrator {
   }
 
   /**
-   * Signal that plan is complete and ready for execution
+   * Signal that plan is complete and ready for tool curation
    */
   onPlanComplete(confidence: number): OrchestratorStepResult {
     const result = this.processEvent({ type: 'PLAN_COMPLETE', confidence });
+    return {
+      success: result.valid,
+      state: this.context.currentState,
+      description: result.description,
+      isComplete: false,
+    };
+  }
+
+  /**
+   * Signal that tool curation is complete and ready for execution
+   */
+  onToolCurationComplete(): OrchestratorStepResult {
+    const result = this.processEvent({ type: 'TOOL_CURATION_COMPLETE' });
     return {
       success: result.valid,
       state: this.context.currentState,

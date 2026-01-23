@@ -16,7 +16,7 @@ export interface ExecutionState {
   /**
    * Current phase of execution
    */
-  phase: 'plan-generation' | 'plan-revision' | 'execution' | 'follow-ups' | 'gap-audit' | 'gap-plan' | 'complete';
+  phase: 'plan-generation' | 'plan-revision' | 'tool-curation' | 'execution' | 'follow-ups' | 'gap-audit' | 'gap-plan' | 'complete';
   
   /**
    * Plan generation state

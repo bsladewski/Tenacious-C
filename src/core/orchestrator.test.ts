@@ -228,16 +228,25 @@ describe('Orchestrator', () => {
       expect(questionsResult.state).toBe('PLAN_REVISION');
     });
 
-    it('should transition to EXECUTION when plan is complete', () => {
+    it('should transition to TOOL_CURATION when plan is complete', () => {
       orchestrator.onPlanGenerated();
       const completeResult = orchestrator.onPlanComplete(95);
       expect(completeResult.success).toBe(true);
-      expect(completeResult.state).toBe('EXECUTION');
+      expect(completeResult.state).toBe('TOOL_CURATION');
     });
 
-    it('should increment exec iteration on plan complete', () => {
+    it('should transition to EXECUTION when tool curation is complete', () => {
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      const curationResult = orchestrator.onToolCurationComplete();
+      expect(curationResult.success).toBe(true);
+      expect(curationResult.state).toBe('EXECUTION');
+    });
+
+    it('should increment exec iteration on tool curation complete', () => {
+      orchestrator.onPlanGenerated();
+      orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
       expect(orchestrator.getContext().execIterationCount).toBe(1);
     });
   });
@@ -247,6 +256,7 @@ describe('Orchestrator', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
     });
 
     it('should transition to FOLLOW_UPS when execution has follow-ups', () => {
@@ -273,6 +283,7 @@ describe('Orchestrator', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(true, false);
     });
 
@@ -306,6 +317,7 @@ describe('Orchestrator', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
     });
 
@@ -327,6 +339,7 @@ describe('Orchestrator', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(true);
     });
@@ -355,6 +368,7 @@ describe('Orchestrator', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(false); // No gaps -> SUMMARY_GENERATION
     });
@@ -457,6 +471,7 @@ describe('Orchestrator', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(95);
+      orchestrator.onToolCurationComplete();
 
       const summary = orchestrator.getRunSummary();
 
@@ -465,7 +480,7 @@ describe('Orchestrator', () => {
       expect(summary.planRevisions).toBe(0);
       expect(summary.execIterations).toBe(1);
       expect(summary.followUpIterations).toBe(0);
-      expect(summary.transitionCount).toBe(3);
+      expect(summary.transitionCount).toBe(4);
     });
   });
 

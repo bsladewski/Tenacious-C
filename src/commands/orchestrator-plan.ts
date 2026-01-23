@@ -23,6 +23,7 @@ import { getExecutePlanTemplate } from '../templates/execute-plan.template';
 import { getExecuteFollowUpsTemplate } from '../templates/execute-follow-ups.template';
 import { getGapAuditTemplate } from '../templates/gap-audit.template';
 import { getGapPlanTemplate } from '../templates/gap-plan.template';
+import { getToolCurationTemplate } from '../templates/tool-curation.template';
 import { interpolateTemplate } from '../templates/prompt-template';
 import {
   readPlanMetadata,
@@ -32,6 +33,7 @@ import {
   readQAHistory,
   readExecuteMetadata,
   readGapAuditMetadata,
+  readToolCurationMetadata,
   validateExecutionArtifacts,
   validatePlanArtifacts,
   saveExecutionState,
@@ -311,6 +313,10 @@ async function runOrchestrationLoop(
 
       case 'PLAN_REVISION':
         await handlePlanRevision(ctx, previewPlanFlag);
+        break;
+
+      case 'TOOL_CURATION':
+        await handleToolCuration(ctx);
         break;
 
       case 'EXECUTION':
@@ -603,6 +609,81 @@ async function handlePlanRevision(
 }
 
 /**
+ * Handle tool curation phase
+ */
+async function handleToolCuration(ctx: OrchestratorPlanContext): Promise<void> {
+  const { orchestrator, timestampDirectory } = ctx;
+
+  console.log('\n🔧 Curating verification tools...');
+
+  // Set up tool curation output directory
+  const toolCurationOutputDirectory = resolve(timestampDirectory, 'tool-curation');
+  await ctx.deps.fileSystem.mkdir(toolCurationOutputDirectory, true);
+
+  // Get template and interpolate
+  const repoRoot = process.cwd();
+  const template = getToolCurationTemplate();
+  const prompt = interpolateTemplate(template, {
+    requirementsPath: ctx.requirementsPath,
+    planPath: ctx.currentPlanPath,
+    outputDirectory: toolCurationOutputDirectory,
+    repoRoot,
+  });
+
+  // Get CLI tool for curation (uses plan tool)
+  const planTool = await getCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
+  const planToolType = await selectCliToolForAction('plan', ctx.currentPlanCliTool, ctx.specifiedCliTool);
+
+  // Store the selected tool type in context for subsequent iterations
+  if (!ctx.currentPlanCliTool) {
+    ctx.currentPlanCliTool = planToolType;
+  }
+
+  // Execute tool curation
+  const context: ExecutionContext = {
+    phase: 'tool-curation',
+    outputDirectory: toolCurationOutputDirectory,
+  };
+  const result = await executeWithFallback(
+    planTool,
+    planToolType,
+    prompt,
+    ctx.currentPlanModel,
+    ctx.currentFallbackTools,
+    context
+  );
+
+  // Update state if fallback occurred
+  if (result.fallbackOccurred) {
+    ctx.currentPlanCliTool = result.usedTool;
+    ctx.currentPlanModel = result.usedModel;
+    ctx.currentFallbackTools = result.remainingFallbackTools;
+  }
+
+  console.log('\n✅ Tool curation complete!');
+
+  // Read and print summary
+  try {
+    const toolCurationMetadata = readToolCurationMetadata(toolCurationOutputDirectory);
+    if (toolCurationMetadata.summary) {
+      console.log('\n🔧 Tool Curation Summary:');
+      console.log('───────────────────────────────────────────────────────────────');
+      console.log(toolCurationMetadata.summary);
+      console.log('───────────────────────────────────────────────────────────────');
+    }
+  } catch (error) {
+    // Non-fatal: log warning but continue
+    if (error instanceof Error && error.message.includes('not found')) {
+      console.log('\n⚠️  Could not read tool-curation-metadata.json. Continuing...');
+    }
+  }
+
+  // Transition to execution
+  orchestrator.onToolCurationComplete();
+  persistState(ctx);
+}
+
+/**
  * Handle execution phase
  */
 async function handleExecution(ctx: OrchestratorPlanContext): Promise<void> {
@@ -791,6 +872,22 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
         ctx.currentFallbackTools = result.remainingFallbackTools;
       }
 
+      // Read updated metadata and print summary
+      try {
+        const updatedMetadata = readExecuteMetadata(executeOutputDirectory);
+        if (updatedMetadata.summary) {
+          console.log('\n📝 Follow-ups Summary:');
+          console.log('───────────────────────────────────────────────────────────────');
+          console.log(updatedMetadata.summary);
+          console.log('───────────────────────────────────────────────────────────────');
+        }
+      } catch (error) {
+        // Non-fatal: log warning but continue
+        if (error instanceof Error && error.message.includes('not found')) {
+          console.log('\n⚠️  Could not read execute-metadata.json. Continuing...');
+        }
+      }
+
       orchestrator.onHardBlockersResolved();
       persistState(ctx);
       return;
@@ -869,6 +966,15 @@ async function handleFollowUps(ctx: OrchestratorPlanContext): Promise<void> {
 
     // Read updated metadata
     const updatedMetadata = readExecuteMetadata(executeOutputDirectory);
+
+    // Print summary if available
+    if (updatedMetadata.summary) {
+      console.log('\n📝 Follow-ups Summary:');
+      console.log('───────────────────────────────────────────────────────────────');
+      console.log(updatedMetadata.summary);
+      console.log('───────────────────────────────────────────────────────────────');
+    }
+
     orchestrator.onFollowUpsComplete(updatedMetadata.hasFollowUps);
     persistState(ctx);
   } catch (error) {

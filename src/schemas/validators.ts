@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { PlanMetadata } from './plan-metadata.schema';
 import type { ExecuteMetadata } from './execute-metadata.schema';
 import type { GapAuditMetadata } from './gap-audit-metadata.schema';
+import type { ToolCurationMetadata } from './tool-curation-metadata.schema';
 
 /**
  * Validation result type
@@ -138,6 +139,44 @@ export function parseGapAuditMetadata(json: string): ValidationResult<GapAuditMe
   try {
     const data = JSON.parse(json);
     return validateGapAuditMetadata(data);
+  } catch (e) {
+    return {
+      success: false,
+      errors: [`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`],
+    };
+  }
+}
+
+// =============================================================================
+// Tool Curation Metadata Schema
+// =============================================================================
+
+const toolCurationMetadataSchema = z.object({
+  schemaVersion: z.literal('1.0.0'),
+  summary: z.string().min(1).max(1000),
+});
+
+/**
+ * Validate tool curation metadata
+ */
+export function validateToolCurationMetadata(data: unknown): ValidationResult<ToolCurationMetadata> {
+  const result = toolCurationMetadataSchema.safeParse(data);
+  if (result.success) {
+    return { success: true, data: result.data as ToolCurationMetadata };
+  }
+  return {
+    success: false,
+    errors: result.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`),
+  };
+}
+
+/**
+ * Parse tool curation metadata from JSON string
+ */
+export function parseToolCurationMetadata(json: string): ValidationResult<ToolCurationMetadata> {
+  try {
+    const data = JSON.parse(json);
+    return validateToolCurationMetadata(data);
   } catch (e) {
     return {
       success: false,
@@ -326,6 +365,7 @@ export type ValidatableArtifactType =
   | 'plan-metadata'
   | 'execute-metadata'
   | 'gap-audit-metadata'
+  | 'tool-curation-metadata'
   | 'effective-config'
   | 'execution-state';
 
@@ -343,6 +383,8 @@ export function validateArtifact(
       return validateExecuteMetadata(data);
     case 'gap-audit-metadata':
       return validateGapAuditMetadata(data);
+    case 'tool-curation-metadata':
+      return validateToolCurationMetadata(data);
     case 'effective-config':
       return validateEffectiveConfig(data);
     case 'execution-state':
@@ -373,6 +415,7 @@ export {
   planMetadataSchema,
   executeMetadataSchema,
   gapAuditMetadataSchema,
+  toolCurationMetadataSchema,
   effectiveConfigSchema,
   executionStateSchema,
   openQuestionSchema,

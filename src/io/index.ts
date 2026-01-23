@@ -31,6 +31,7 @@ export { findLatestResumableRun } from './find-latest-run';
 export { readPlanMetadata } from './read-metadata';
 export { readExecuteMetadata } from './read-execute-metadata';
 export { readGapAuditMetadata } from './read-gap-audit-metadata';
+export { readToolCurationMetadata } from './read-tool-curation-metadata';
 export { clearOpenQuestions } from './update-metadata';
 
 // Artifact scanning and validation
@@ -49,3 +50,12 @@ export {
 // Other IO utilities
 export { writeRequirements } from './write-requirements';
 export { trackQAHistory, readQAHistory } from './track-qa-history';
+
+// Append utilities
+export {
+  AppendSection,
+  VerificationCommandForFormat,
+  appendToFile,
+  formatVerificationSectionForPlan,
+  formatVerificationSectionForRequirements,
+} from './append-artifact';

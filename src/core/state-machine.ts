@@ -13,6 +13,7 @@ export type OrchestrationState =
   | 'IDLE'
   | 'PLAN_GENERATION'
   | 'PLAN_REVISION'
+  | 'TOOL_CURATION'
   | 'EXECUTION'
   | 'FOLLOW_UPS'
   | 'GAP_AUDIT'
@@ -44,6 +45,7 @@ export type OrchestrationEvent =
   | { type: 'NO_GAPS_FOUND' }
   | { type: 'GENERATE_SUMMARY' }
   | { type: 'SUMMARY_COMPLETE' }
+  | { type: 'TOOL_CURATION_COMPLETE' }
   | { type: 'RESUME'; fromState: OrchestrationState }
   | { type: 'ERROR'; error: Error };
 
@@ -91,8 +93,9 @@ export interface TransitionResult {
  */
 const VALID_TRANSITIONS: Record<OrchestrationState, OrchestrationState[]> = {
   IDLE: ['PLAN_GENERATION'],
-  PLAN_GENERATION: ['PLAN_REVISION', 'EXECUTION', 'FAILED'],
-  PLAN_REVISION: ['PLAN_REVISION', 'EXECUTION', 'SUMMARY_GENERATION', 'FAILED'],
+  PLAN_GENERATION: ['PLAN_REVISION', 'TOOL_CURATION', 'FAILED'],
+  PLAN_REVISION: ['PLAN_REVISION', 'TOOL_CURATION', 'SUMMARY_GENERATION', 'FAILED'],
+  TOOL_CURATION: ['EXECUTION', 'FAILED'],
   EXECUTION: ['FOLLOW_UPS', 'GAP_AUDIT', 'FAILED'],
   FOLLOW_UPS: ['FOLLOW_UPS', 'GAP_AUDIT', 'FAILED'],
   GAP_AUDIT: ['GAP_PLAN', 'SUMMARY_GENERATION', 'FAILED'],
@@ -184,13 +187,23 @@ export function transition(
 
     case 'PLAN_COMPLETE':
       if (currentState === 'PLAN_REVISION' || currentState === 'PLAN_GENERATION') {
-        newState = 'EXECUTION';
+        newState = 'TOOL_CURATION';
         newContext = {
           ...newContext,
           lastConfidence: event.confidence,
+        };
+        description = `Plan complete with ${event.confidence}% confidence, starting tool curation`;
+      }
+      break;
+
+    case 'TOOL_CURATION_COMPLETE':
+      if (currentState === 'TOOL_CURATION') {
+        newState = 'EXECUTION';
+        newContext = {
+          ...newContext,
           execIterationCount: 1,
         };
-        description = `Plan complete with ${event.confidence}% confidence, starting execution`;
+        description = 'Tool curation complete, starting execution';
       }
       break;
 
@@ -346,6 +359,7 @@ export function getStateDescription(state: OrchestrationState): string {
     IDLE: 'Waiting to start',
     PLAN_GENERATION: 'Generating initial plan',
     PLAN_REVISION: 'Revising plan (answering questions or improving confidence)',
+    TOOL_CURATION: 'Curating verification tools',
     EXECUTION: 'Executing plan',
     FOLLOW_UPS: 'Processing follow-up tasks',
     GAP_AUDIT: 'Auditing for implementation gaps',
@@ -378,6 +392,7 @@ export function phaseToState(
   phase:
     | 'plan-generation'
     | 'plan-revision'
+    | 'tool-curation'
     | 'execution'
     | 'follow-ups'
     | 'gap-audit'
@@ -387,6 +402,7 @@ export function phaseToState(
   const mapping: Record<string, OrchestrationState> = {
     'plan-generation': 'PLAN_GENERATION',
     'plan-revision': 'PLAN_REVISION',
+    'tool-curation': 'TOOL_CURATION',
     execution: 'EXECUTION',
     'follow-ups': 'FOLLOW_UPS',
     'gap-audit': 'GAP_AUDIT',
@@ -401,11 +417,12 @@ export function phaseToState(
  */
 export function stateToPhase(
   state: OrchestrationState
-): 'plan-generation' | 'plan-revision' | 'execution' | 'follow-ups' | 'gap-audit' | 'gap-plan' | 'complete' {
+): 'plan-generation' | 'plan-revision' | 'tool-curation' | 'execution' | 'follow-ups' | 'gap-audit' | 'gap-plan' | 'complete' {
   const mapping: Record<OrchestrationState, string> = {
     IDLE: 'plan-generation',
     PLAN_GENERATION: 'plan-generation',
     PLAN_REVISION: 'plan-revision',
+    TOOL_CURATION: 'tool-curation',
     EXECUTION: 'execution',
     FOLLOW_UPS: 'follow-ups',
     GAP_AUDIT: 'gap-audit',
@@ -417,6 +434,7 @@ export function stateToPhase(
   return mapping[state] as
     | 'plan-generation'
     | 'plan-revision'
+    | 'tool-curation'
     | 'execution'
     | 'follow-ups'
     | 'gap-audit'

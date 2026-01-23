@@ -11,6 +11,8 @@ import { join, basename, extname } from 'path';
 export type ArtifactType =
   | 'plan'
   | 'plan-metadata'
+  | 'tool-curation-report'
+  | 'tool-curation-metadata'
   | 'execution-summary'
   | 'execute-metadata'
   | 'gap-audit-summary'
@@ -45,6 +47,8 @@ export interface NamingContext {
 const ARTIFACT_PATTERNS: Record<ArtifactType, (ctx: NamingContext) => string> = {
   plan: () => 'plan.md',
   'plan-metadata': () => 'plan-metadata.json',
+  'tool-curation-report': () => 'tool-curation-report.md',
+  'tool-curation-metadata': () => 'tool-curation-metadata.json',
   'execution-summary': (ctx) => {
     const base = `execution-summary-${ctx.execIteration ?? 1}`;
     if (ctx.followUpIteration !== undefined && ctx.followUpIteration >= 0) {
@@ -102,6 +106,8 @@ export interface RunDirectoryStructure {
   root: string;
   /** Plan output directory */
   plan: string;
+  /** Tool curation output directory */
+  toolCuration: string;
   /** Execute output directory (initial) */
   execute: string;
   /** Execute output directory for a specific iteration */
@@ -125,6 +131,7 @@ export function getRunDirectoryStructure(rootDir: string): RunDirectoryStructure
   return {
     root: rootDir,
     plan: join(rootDir, 'plan'),
+    toolCuration: join(rootDir, 'tool-curation'),
     execute: join(rootDir, 'execute'),
     executeN: (n: number) => (n === 1 ? join(rootDir, 'execute') : join(rootDir, `execute-${n}`)),
     gapAudit: join(rootDir, 'gap-audit'),
@@ -248,6 +255,8 @@ export function getStandardArtifactPaths(
   return {
     plan: getArtifactPath(dirs.plan, 'plan'),
     'plan-metadata': getArtifactPath(dirs.plan, 'plan-metadata'),
+    'tool-curation-report': getArtifactPath(dirs.toolCuration, 'tool-curation-report'),
+    'tool-curation-metadata': getArtifactPath(dirs.toolCuration, 'tool-curation-metadata'),
     'execution-summary': getArtifactPath(dirs.executeN(execIteration), 'execution-summary', ctx),
     'execute-metadata': getArtifactPath(dirs.executeN(execIteration), 'execute-metadata'),
     'gap-audit-summary': getArtifactPath(dirs.gapAuditN(execIteration), 'gap-audit-summary', ctx),

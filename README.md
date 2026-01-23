@@ -7,6 +7,7 @@ An intelligent, iterative AI-powered development tool that generates comprehensi
 - **Intelligent Planning**: Generates detailed, structured plans with confidence scoring
 - **Iterative Refinement**: Automatically refines plans through question-answering and confidence-based improvements
 - **Plan Execution**: Executes plans with automatic follow-up iterations to handle blockers
+- **Plan-Only Mode**: Option to generate and refine plans without execution, useful for review and manual execution
 - **Gap Analysis**: Performs gap audits and generates gap closure plans when execution reveals missing requirements
 - **Nemesis Mode**: Optional adversarial gap audit mode for maximum thoroughness in defect detection
 - **Multi-Tool Support**: Works with the Codex CLI, GitHub Copilot CLI, Cursor CLI, and Claude Code CLI
@@ -250,6 +251,28 @@ tenacious-c --resume
 
 **Note:** The tool saves state after each major phase (plan generation, execution, gap audit, gap plan). If a run is interrupted, use `--resume` to continue without losing progress.
 
+#### `--plan-only`
+
+Skip execution phase and stop after plan generation is complete. When enabled, the tool will:
+
+- Generate and refine the plan as normal (including question-answering and confidence-based improvements)
+- Skip the execution phase entirely
+- Copy the final plan to the working directory as `plan_<timestamp>.md`
+- Generate a final summary and exit
+
+This mode is useful when you want to:
+- Review plans before execution
+- Generate plans for manual execution
+- Test plan generation without incurring execution costs
+- Create plans for documentation or review purposes
+
+**Example:**
+```bash
+tenacious-c "Add user authentication" --plan-only
+```
+
+**Note:** In plan-only mode, the tool will still go through the full plan refinement process (answering questions, improving confidence) but will skip all execution, follow-up, and gap audit phases.
+
 #### `--the-prompt-of-destiny`
 
 Override all iteration limits. When enabled, the tool will continue iterating until the plan is truly complete, regardless of limits.
@@ -380,10 +403,12 @@ Tenacious C follows a comprehensive workflow to ensure thorough plan generation 
 2. **Iterative Refinement**: Refines the plan through multiple iterations:
    - **Question-Answering Loop**: Prompts you to answer open questions
    - **Confidence-Based Improvement**: Automatically deepens the plan if confidence is below threshold
-3. **Plan Execution**: Executes the plan using the selected AI CLI tool
+3. **Plan Execution** (optional with `--plan-only`): Executes the plan using the selected AI CLI tool
 4. **Follow-Up Iterations**: Performs follow-up work to address blockers
 5. **Gap Analysis**: If gaps are found, performs gap audits and generates gap closure plans
 6. **Iterative Execution**: Repeats execution cycles until completion
+
+**Note:** With `--plan-only`, the workflow stops after step 2, skipping all execution phases and copying the final plan to the working directory.
 
 ### Execution Engine
 

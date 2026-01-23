@@ -10,6 +10,7 @@ export { getExecuteFollowUpsTemplate } from './execute-follow-ups.template';
 export { getGapAuditTemplate } from './gap-audit.template';
 export { getGapPlanTemplate } from './gap-plan.template';
 export { getGenerateSummaryTemplate } from './generate-summary.template';
+export { getToolCurationTemplate } from './tool-curation.template';
 
 // Re-export for convenience
 export { interpolateTemplate as interpolate } from './prompt-template';

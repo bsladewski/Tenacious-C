@@ -54,8 +54,20 @@ describe('State Machine', () => {
       expect(isValidTransition('PLAN_GENERATION', 'PLAN_REVISION')).toBe(true);
     });
 
-    it('should allow PLAN_GENERATION to EXECUTION', () => {
-      expect(isValidTransition('PLAN_GENERATION', 'EXECUTION')).toBe(true);
+    it('should allow PLAN_GENERATION to TOOL_CURATION', () => {
+      expect(isValidTransition('PLAN_GENERATION', 'TOOL_CURATION')).toBe(true);
+    });
+
+    it('should allow PLAN_REVISION to TOOL_CURATION', () => {
+      expect(isValidTransition('PLAN_REVISION', 'TOOL_CURATION')).toBe(true);
+    });
+
+    it('should allow TOOL_CURATION to EXECUTION', () => {
+      expect(isValidTransition('TOOL_CURATION', 'EXECUTION')).toBe(true);
+    });
+
+    it('should not allow PLAN_GENERATION to EXECUTION directly', () => {
+      expect(isValidTransition('PLAN_GENERATION', 'EXECUTION')).toBe(false);
     });
 
     it('should allow self-transitions for PLAN_REVISION', () => {
@@ -122,12 +134,21 @@ describe('State Machine', () => {
     });
 
     describe('PLAN_COMPLETE event', () => {
-      it('should transition to EXECUTION with confidence', () => {
+      it('should transition to TOOL_CURATION with confidence', () => {
         const context: OrchestrationContext = { ...createInitialContext(), currentState: 'PLAN_REVISION' };
         const result = transition(context, { type: 'PLAN_COMPLETE', confidence: 95 });
         expect(result.valid).toBe(true);
-        expect(result.newState).toBe('EXECUTION');
+        expect(result.newState).toBe('TOOL_CURATION');
         expect(result.context.lastConfidence).toBe(95);
+      });
+    });
+
+    describe('TOOL_CURATION_COMPLETE event', () => {
+      it('should transition to EXECUTION', () => {
+        const context: OrchestrationContext = { ...createInitialContext(), currentState: 'TOOL_CURATION' };
+        const result = transition(context, { type: 'TOOL_CURATION_COMPLETE' });
+        expect(result.valid).toBe(true);
+        expect(result.newState).toBe('EXECUTION');
         expect(result.context.execIterationCount).toBe(1);
       });
     });
@@ -294,6 +315,7 @@ describe('State Machine', () => {
     it('should return description for each state', () => {
       expect(getStateDescription('IDLE')).toBe('Waiting to start');
       expect(getStateDescription('PLAN_GENERATION')).toBe('Generating initial plan');
+      expect(getStateDescription('TOOL_CURATION')).toBe('Curating verification tools');
       expect(getStateDescription('EXECUTION')).toBe('Executing plan');
       expect(getStateDescription('COMPLETE')).toBe('Orchestration complete');
       expect(getStateDescription('FAILED')).toBe('Orchestration failed');
@@ -326,6 +348,7 @@ describe('State Machine', () => {
     it('should return true for in-progress states', () => {
       expect(isResumableState('EXECUTION')).toBe(true);
       expect(isResumableState('PLAN_REVISION')).toBe(true);
+      expect(isResumableState('TOOL_CURATION')).toBe(true);
       expect(isResumableState('GAP_AUDIT')).toBe(true);
     });
   });
@@ -334,6 +357,7 @@ describe('State Machine', () => {
     it('should map phase names to states', () => {
       expect(phaseToState('plan-generation')).toBe('PLAN_GENERATION');
       expect(phaseToState('plan-revision')).toBe('PLAN_REVISION');
+      expect(phaseToState('tool-curation')).toBe('TOOL_CURATION');
       expect(phaseToState('execution')).toBe('EXECUTION');
       expect(phaseToState('follow-ups')).toBe('FOLLOW_UPS');
       expect(phaseToState('gap-audit')).toBe('GAP_AUDIT');
@@ -346,6 +370,7 @@ describe('State Machine', () => {
     it('should map states to phase names', () => {
       expect(stateToPhase('PLAN_GENERATION')).toBe('plan-generation');
       expect(stateToPhase('PLAN_REVISION')).toBe('plan-revision');
+      expect(stateToPhase('TOOL_CURATION')).toBe('tool-curation');
       expect(stateToPhase('EXECUTION')).toBe('execution');
       expect(stateToPhase('FOLLOW_UPS')).toBe('follow-ups');
       expect(stateToPhase('GAP_AUDIT')).toBe('gap-audit');

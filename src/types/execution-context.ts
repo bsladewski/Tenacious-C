@@ -6,7 +6,7 @@ export interface ExecutionContext {
    * Current phase of execution
    */
   phase: 'plan-generation' | 'answer-questions' | 'improve-plan' |
-         'execute-plan' | 'execute-follow-ups' | 'gap-audit' | 'gap-plan' | 'generate-summary';
+         'execute-plan' | 'execute-follow-ups' | 'gap-audit' | 'gap-plan' | 'generate-summary' | 'tool-curation';
 
   /**
    * Output directory for this operation

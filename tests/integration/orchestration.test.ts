@@ -150,7 +150,9 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
-
+      // Now goes through TOOL_CURATION first
+      expect(orchestrator.getCurrentState()).toBe('TOOL_CURATION');
+      orchestrator.onToolCurationComplete();
       expect(orchestrator.getCurrentState()).toBe('EXECUTION');
     });
 
@@ -166,6 +168,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(true, false);
 
       expect(orchestrator.getCurrentState()).toBe('FOLLOW_UPS');
@@ -183,6 +186,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
 
       expect(orchestrator.getCurrentState()).toBe('GAP_AUDIT');
@@ -200,6 +204,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(false);
       orchestrator.onSummaryComplete();
@@ -220,6 +225,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(true);
 
@@ -238,6 +244,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(true);
       orchestrator.onGapPlanComplete();
@@ -360,6 +367,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
 
       const savedState = orchestrator.getRunState();
       expect(savedState.context.currentState).toBe('EXECUTION');
@@ -392,6 +400,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.onConfidenceLow(50, 85);
       orchestrator.onPlanImproved();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(true);
       orchestrator.onGapPlanComplete();
@@ -441,6 +450,7 @@ describe('Orchestration Integration Tests', () => {
       orchestrator.start('Test requirements');
       orchestrator.onPlanGenerated();
       orchestrator.onPlanComplete(90);
+      orchestrator.onToolCurationComplete();
       orchestrator.onExecutionComplete(false, false);
       orchestrator.onGapAuditComplete(false);
       orchestrator.onSummaryComplete();

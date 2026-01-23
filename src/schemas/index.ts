@@ -31,6 +31,16 @@ export {
 } from './gap-audit-metadata.schema';
 
 /**
+ * Export tool curation metadata schema
+ */
+export {
+  ToolCurationMetadata,
+  toolCurationMetadataJsonSchema,
+  getToolCurationMetadataSchemaString,
+  exampleToolCurationMetadata,
+} from './tool-curation-metadata.schema';
+
+/**
  * Export validators
  */
 export {
@@ -42,6 +52,8 @@ export {
   parseExecuteMetadata,
   validateGapAuditMetadata,
   parseGapAuditMetadata,
+  validateToolCurationMetadata,
+  parseToolCurationMetadata,
   validateEffectiveConfig,
   validateExecutionState,
   parseExecutionState,
@@ -51,6 +63,7 @@ export {
   planMetadataSchema,
   executeMetadataSchema,
   gapAuditMetadataSchema,
+  toolCurationMetadataSchema,
   effectiveConfigSchema,
   executionStateSchema,
 } from './validators';

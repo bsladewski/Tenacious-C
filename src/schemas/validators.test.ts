@@ -10,6 +10,8 @@ import {
   parseExecuteMetadata,
   validateGapAuditMetadata,
   parseGapAuditMetadata,
+  validateToolCurationMetadata,
+  parseToolCurationMetadata,
   validateEffectiveConfig,
   validateExecutionState,
   parseExecutionState,
@@ -253,6 +255,55 @@ describe('parseGapAuditMetadata', () => {
   });
 });
 
+describe('validateToolCurationMetadata', () => {
+  it('should validate correct tool curation metadata', () => {
+    const data = {
+      schemaVersion: '1.0.0' as const,
+      summary: 'Selected 3 verification commands: npm run lint, npm run test, and npm run build.',
+    };
+    const result = validateToolCurationMetadata(data);
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(data);
+  });
+
+  it('should reject missing schemaVersion', () => {
+    const data = { summary: 'Test summary' };
+    const result = validateToolCurationMetadata(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid schemaVersion', () => {
+    const data = { schemaVersion: '2.0.0', summary: 'Test' };
+    const result = validateToolCurationMetadata(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject empty summary', () => {
+    const data = { schemaVersion: '1.0.0' as const, summary: '' };
+    const result = validateToolCurationMetadata(data);
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject summary longer than 1000 chars', () => {
+    const data = { schemaVersion: '1.0.0' as const, summary: 'x'.repeat(1001) };
+    const result = validateToolCurationMetadata(data);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('parseToolCurationMetadata', () => {
+  it('should parse valid JSON', () => {
+    const json = JSON.stringify({ schemaVersion: '1.0.0', summary: 'Test summary' });
+    const result = parseToolCurationMetadata(json);
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid JSON', () => {
+    const result = parseToolCurationMetadata('not valid json');
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('validateEffectiveConfig', () => {
   const validConfig = {
     schemaVersion: '1.0.0' as const,
@@ -448,6 +499,12 @@ describe('validateArtifact', () => {
   it('should validate gap-audit-metadata type', () => {
     const data = { schemaVersion: '1.0.0', gapsIdentified: false, summary: 'Test' };
     const result = validateArtifact('gap-audit-metadata', data);
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate tool-curation-metadata type', () => {
+    const data = { schemaVersion: '1.0.0', summary: 'Selected verification commands' };
+    const result = validateArtifact('tool-curation-metadata', data);
     expect(result.success).toBe(true);
   });
 });
