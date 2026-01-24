@@ -1005,12 +1005,19 @@ async function handleGapAudit(ctx: OrchestratorPlanContext): Promise<void> {
 
   await ctx.deps.fileSystem.mkdir(gapAuditOutputDirectory, true);
 
+  // Construct execution summary path for verification tools check
+  const executeOutputDirectory = isInitialExecution
+    ? resolve(timestampDirectory, 'execute')
+    : resolve(timestampDirectory, `execute-${execIterationCount}`);
+  const executionSummaryPath = resolve(executeOutputDirectory, `execution-summary-${execIterationCount}.md`);
+
   const gapAuditTemplate = getGapAuditTemplate(ctx.nemesis);
   const gapAuditPrompt = interpolateTemplate(gapAuditTemplate, {
     requirementsPath: ctx.requirementsPath,
     planPath: ctx.currentPlanPath,
     outputDirectory: gapAuditOutputDirectory,
     executionIteration: execIterationCount.toString(),
+    executionSummaryPath,
   });
 
   const auditTool = await getCliToolForAction('audit', ctx.currentAuditCliTool, ctx.specifiedCliTool);
