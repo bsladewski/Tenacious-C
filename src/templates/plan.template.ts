@@ -85,7 +85,7 @@ Determine whether the input is:
 - You MUST output **two files** with exact filenames:
   1. **Plan markdown file:** \`{{outputDirectory}}/plan.md\`
   2. **Metadata JSON file:** \`{{outputDirectory}}/plan-metadata.json\`
-     - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the plan. It MUST contain ONLY these top-level keys: \`confidence\`, \`openQuestions\`, \`summary\`. Do NOT add any other keys.
+     - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the plan. It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`confidence\`, \`openQuestions\`, \`summary\`. Do NOT add any other keys.
      - **CRITICAL - VALID JSON ONLY:** The file MUST be valid JSON parseable by \`JSON.parse()\`. No markdown code fences, no comments, no extra text before or after the JSON object.
      - **CRITICAL - VALIDATION REQUIRED:** After writing \`plan-metadata.json\`, you MUST run this validation command:
        \`\`\`bash
@@ -97,12 +97,13 @@ Determine whether the input is:
 
 **CRITICAL - ALLOWED KEYS ONLY:**
 - \`plan-metadata.json\` is NOT a JSON version of the plan.
-- It MUST contain ONLY these top-level keys: \`confidence\`, \`openQuestions\`, \`summary\`.
+- It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`confidence\`, \`openQuestions\`, \`summary\`.
 - It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
 
 **Example plan-metadata.json:**
 \`\`\`json
 {
+  "schemaVersion": "1.0.0",
   "confidence": 80,
   "openQuestions": [],
   "summary": "Plain text 1–2 paragraph summary."
@@ -116,6 +117,7 @@ ${metadataSchema}
 \`\`\`
 
 The metadata file contains:
+- \`schemaVersion\`: Must always be the string \`"1.0.0"\`
 - \`confidence\`: A number (0-100) representing your confidence in the plan's completeness and accuracy
 - \`openQuestions\`: An array of questions that need clarification. **Each question MUST include at least 2 suggested answers** in the \`suggestedAnswers\` array to enable interactive selection.
 - \`summary\`: A brief terminal-friendly summary (1-2 paragraphs worth of text) of what was planned. Use plain text (no markdown formatting), suitable for terminal display, summarizing the key aspects of the plan: what will be implemented, main phases, and important decisions.
@@ -140,7 +142,7 @@ If parsing fails, you MUST fix the file and re-run the validation until it succe
 **CRITICAL:** Before completing your response, you MUST verify ALL of the following:
 
 - [ ] Created \`{{outputDirectory}}/plan.md\` with the plan content
-- [ ] Created \`{{outputDirectory}}/plan-metadata.json\` with ONLY the allowed keys (confidence, openQuestions, summary)
+- [ ] Created \`{{outputDirectory}}/plan-metadata.json\` with ONLY the allowed keys (schemaVersion, confidence, openQuestions, summary)
 - [ ] Ran the JSON validation command and it succeeded (output shows "plan-metadata.json parses")
 - [ ] Both files are in the correct location (\`{{outputDirectory}}\`) with the correct filenames
 - [ ] Every open question has at least 2 suggested answers in the \`suggestedAnswers\` array

@@ -210,7 +210,7 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
    - **Note:** This is execution iteration {{executionIteration}} - use this filename for full history tracking
 
 2. **Gap Audit Metadata JSON:** \`{{outputDirectory}}/gap-audit-metadata.json\`
-   - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the gap audit summary. It MUST contain ONLY these top-level keys: \`gapsIdentified\`, \`summary\`. Do NOT add any other keys.
+   - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the gap audit summary. It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`gapsIdentified\`, \`summary\`. Do NOT add any other keys.
    - **CRITICAL - VALID JSON ONLY:** The file MUST be valid JSON parseable by \`JSON.parse()\`. No markdown code fences, no comments, no extra text before or after the JSON object.
    - Set \`gapsIdentified\` to \`true\` if any gaps were found, \`false\` otherwise
    - **CRITICAL - VALIDATION REQUIRED:** After writing \`gap-audit-metadata.json\`, you MUST run this validation command:
@@ -248,12 +248,13 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 
 **CRITICAL - ALLOWED KEYS ONLY:**
 - \`gap-audit-metadata.json\` is NOT a JSON version of the gap audit summary.
-- It MUST contain ONLY these top-level keys: \`gapsIdentified\`, \`summary\`.
+- It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`gapsIdentified\`, \`summary\`.
 - It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
 
 **Example gap-audit-metadata.json:**
 \`\`\`json
 {
+  "schemaVersion": "1.0.0",
   "gapsIdentified": false,
   "summary": "Plain text 1–2 paragraph summary."
 }
@@ -289,7 +290,7 @@ If parsing fails, you MUST fix the file and re-run the validation until it succe
 **CRITICAL:** Before completing your response, you MUST verify ALL of the following:
 
 - [ ] Created \`{{outputDirectory}}/gap-audit-summary-{{executionIteration}}.md\` with the gap audit summary
-- [ ] Created \`{{outputDirectory}}/gap-audit-metadata.json\` with ONLY the allowed keys (gapsIdentified, summary)
+- [ ] Created \`{{outputDirectory}}/gap-audit-metadata.json\` with ONLY the allowed keys (schemaVersion, gapsIdentified, summary)
 - [ ] Ran the JSON validation command and it succeeded (output shows "gap-audit-metadata.json parses")
 - [ ] Both files are in the correct location (\`{{outputDirectory}}\`) with the correct filenames
 - [ ] The \`gapsIdentified\` boolean correctly reflects whether any gaps were found

@@ -160,7 +160,7 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
    - **Note:** This is execution iteration {{executionIteration}}, follow-up iteration {{followUpIteration}} - use this filename for full history tracking
 
 2. **Execute Metadata JSON:** \`{{outputDirectory}}/execute-metadata.json\`
-   - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the execution summary. It MUST contain ONLY these top-level keys: \`hasFollowUps\`, \`hardBlockers\`, \`summary\`. Do NOT add any other keys.
+   - **CRITICAL - ALLOWED KEYS ONLY:** This file is NOT a JSON version of the execution summary. It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`hasFollowUps\`, \`hardBlockers\`, \`summary\`. Do NOT add any other keys.
    - **CRITICAL - VALID JSON ONLY:** The file MUST be valid JSON parseable by \`JSON.parse()\`. No markdown code fences, no comments, no extra text before or after the JSON object.
    - Set \`hasFollowUps\` to \`true\` if there are any follow-ups remaining in the execution summary (even if just one)
    - Set \`hasFollowUps\` to \`false\` if all follow-ups have been completed
@@ -247,12 +247,13 @@ You MUST output **two files** in \`{{outputDirectory}}\`:
 
 **CRITICAL - ALLOWED KEYS ONLY:**
 - \`execute-metadata.json\` is NOT a JSON version of the execution summary.
-- It MUST contain ONLY these top-level keys: \`hasFollowUps\`, \`hardBlockers\`, \`summary\`.
+- It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`hasFollowUps\`, \`hardBlockers\`, \`summary\`.
 - It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
 
 **Example execute-metadata.json:**
 \`\`\`json
 {
+  "schemaVersion": "1.0.0",
   "hasFollowUps": false,
   "hardBlockers": [],
   "summary": "Plain text 1–2 paragraph summary."
@@ -289,7 +290,7 @@ If parsing fails, you MUST fix the file and re-run the validation until it succe
 **CRITICAL:** Before completing your response, you MUST verify ALL of the following:
 
 - [ ] Created \`{{outputDirectory}}/execution-summary-{{executionIteration}}-followup-{{followUpIteration}}.md\` with the execution summary
-- [ ] Created/updated \`{{outputDirectory}}/execute-metadata.json\` with ONLY the allowed keys (hasFollowUps, hardBlockers, summary)
+- [ ] Created/updated \`{{outputDirectory}}/execute-metadata.json\` with ONLY the allowed keys (schemaVersion, hasFollowUps, hardBlockers, summary)
 - [ ] Ran the JSON validation command and it succeeded (output shows "execute-metadata.json parses")
 - [ ] Both files are in the correct location (\`{{outputDirectory}}\`) with the correct filenames
 - [ ] The \`hasFollowUps\` boolean correctly reflects whether there are remaining follow-ups (\`false\` if all done, \`true\` if any remain)

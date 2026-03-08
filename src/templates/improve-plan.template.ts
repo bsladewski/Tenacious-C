@@ -77,12 +77,13 @@ The metadata file at \`{{outputDirectory}}/plan-metadata.json\` MUST conform to 
 
 **CRITICAL - ALLOWED KEYS ONLY:**
 - \`plan-metadata.json\` is NOT a JSON version of the plan.
-- It MUST contain ONLY these top-level keys: \`confidence\`, \`openQuestions\`, \`summary\`.
+- It MUST contain ONLY these top-level keys: \`schemaVersion\`, \`confidence\`, \`openQuestions\`, \`summary\`.
 - It MUST be valid JSON parseable by \`JSON.parse()\` (no markdown fences, no comments, no extra text).
 
 **Example plan-metadata.json:**
 \`\`\`json
 {
+  "schemaVersion": "1.0.0",
   "confidence": 80,
   "openQuestions": [],
   "summary": "Plain text 1–2 paragraph summary."
